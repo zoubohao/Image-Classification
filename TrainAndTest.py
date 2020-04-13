@@ -16,7 +16,7 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    batchSize = 32
+    batchSize = 16
     tMaxIni = 900
     growthRate = 32
     blocks = [6,12,24,16]
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     testModelLoad = 10
     decayRate = 0.85
     fy = 4
-    stepTimes = 1
+    stepTimes = 2
     saveTimes = 5000
     clip_value = 10
     ### Data pre-processing
@@ -86,7 +86,6 @@ if __name__ == "__main__":
                 oriLoss = lossCri(predict,labelsCuda)
                 loss = oriLoss / stepTimes
                 loss.backward()
-                nn.utils.clip_grad_value_(model.parameters(),clip_value)
                 #optimizer.step()
                 if trainingTimes % displayTimes == 0:
                     print("#########")
@@ -98,6 +97,7 @@ if __name__ == "__main__":
                     print("Training time is ", trainingTimes)
                 trainingTimes += 1
                 if trainingTimes % stepTimes == 0:
+                    nn.utils.clip_grad_value_(model.parameters(), clip_value)
                     learning_rate = scheduler.calculateLearningRate()
                     state_dic = optimizer.state_dict()
                     state_dic["param_groups"][0]["lr"] = learning_rate
