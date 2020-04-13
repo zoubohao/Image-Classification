@@ -16,8 +16,8 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    batchSize = 16
-    tMaxIni = 1000
+    batchSize = 32
+    tMaxIni = 900
     growthRate = 32
     blocks = [6,12,24,16]
     learning_rate = 1e-3
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     loadWeight = False
     trainModelLoad = 3
     testModelLoad = 10
-    decayRate = 0.95
+    decayRate = 0.85
     fy = 4
     stepTimes = 1
     saveTimes = 5000
@@ -72,7 +72,7 @@ if __name__ == "__main__":
                 torch.nn.init.xavier_normal_(m.weight)
                 #torch.nn.init.constant_(m.bias, 0.)
     ### Train or Test
-    scheduler = Model.CosineDecaySchedule(1e-6,learning_rate,tMaxIni,1.12,lrDecayRate=decayRate)
+    scheduler = Model.CosineDecaySchedule(1e-5,learning_rate,tMaxIni,1.15,lrDecayRate=decayRate)
     if ifTrain:
         model.train()
         trainingTimes = 0

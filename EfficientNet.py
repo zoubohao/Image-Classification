@@ -206,7 +206,7 @@ class EfficientNetReform(nn.Module):
         bn_eps = 0.001
         d = math.ceil(math.pow(1.2,fy))  ## depth
         w = math.ceil(math.pow(1.1,fy))  ## width channels
-        self.r = 32 * math.ceil(math.pow(1.15,fy)) ## resolution
+        self.r = math.ceil(math.pow(1.15,fy)) ## resolution
         ### stem
         self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=3, stride=1, bias=False)
         self.bn0 = nn.BatchNorm2d(num_features=32 * w, momentum=bn_mom, eps=bn_eps)
@@ -240,9 +240,9 @@ class EfficientNetReform(nn.Module):
         :param x:
         :return:
         """
-        # h , w = x.shape[-2],x.shape[-1]
-        # xReshape = F.interpolate(x,size=[h + self.r , w + self.r],mode="bilinear",align_corners=True)
-        xStem = self.bn0(self.conv_stem(x))
+        h , w = x.shape[-2],x.shape[-1]
+        xReshape = F.interpolate(x,size=[h  * self.r , w  *self.r],mode="bilinear",align_corners=True)
+        xStem = self.bn0(self.conv_stem(xReshape))
         p1 = self.block2(self.block1(xStem))
         p2 = self.block3(p1)
         p3 = self.block4(p2)

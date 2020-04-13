@@ -23,8 +23,11 @@ class CosineDecaySchedule :
     def calculateLearningRate(self):
         if self.curTT > self.trainingTimes:
             self.__restart()
-        lrC = float(self.lrMin) + 0.5 * (self.lrMax - self.lrMin) \
-              * (1. + math.cos(self.curTT / self.trainingTimes * math.pi))
+        if self.lrMax > self.lrMin:
+            lrC = float(self.lrMin) + 0.5 * (self.lrMax - self.lrMin) \
+                  * (1. + math.cos(self.curTT / self.trainingTimes * math.pi))
+        else:
+            lrC = self.lrMin
         return lrC
 
     def step(self):
