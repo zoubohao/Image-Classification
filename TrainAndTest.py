@@ -8,7 +8,6 @@ import torch.optim.rmsprop as rmsprop
 from sklearn import metrics
 import EfficientNet
 from prefetch_generator import BackgroundGenerator
-from MyLoss import SimulateCenterLoss
 
 class DataLoaderX(d.DataLoader):
 
@@ -17,23 +16,23 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    batchSize = 8
-    tMaxIni = 1200
+    batchSize = 4
+    tMaxIni = 800
     growthRate = 32
     blocks = [6,12,24,16]
     learning_rate = 1e-4
     labelsNumber = 10
     ifUseBn = True
     ifTrain = True
-    epoch = 50
+    epoch = 25
     displayTimes = 25
-    modelSavePath = "./BN/"
-    loadWeight = True
+    modelSavePath = "./"
+    loadWeight = False
     trainModelLoad = 3
     testModelLoad = 10
-    decayRate = 0.93
-    fy = 5
-    stepTimes =2
+    decayRate = 0.985
+    fy = 3
+    stepTimes = 4
     ### Data pre-processing
     transformationTrain = tv.transforms.Compose([
         tv.transforms.RandomHorizontalFlip(p = 0.25),
@@ -53,13 +52,13 @@ if __name__ == "__main__":
     dataLoader = DataLoaderX(cifarDataTrainSet,batch_size=batchSize,shuffle=True,num_workers=4,pin_memory=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ### model construct
-    model = Model.MyModel(3,labelsNumber,blocks,growthRate,ifUseBn).to(device)
+    model = EfficientNet.EfficientNetReform(in_channels=3,num_classes=labelsNumber,fy=fy,drop_connect_rate=0.3).to(device)
     #model = EfficientNet.EfficientNet(3,labelsNumber,fy=fy,dropOutRate=0.2).to(device)
     print(model)
     #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
     #lossCri = nn.CrossEntropyLoss(reduction="sum")
-    lossCri = SimulateCenterLoss(labelsNumber,1024,0.4).to(device)
-    optimizer = rmsprop.RMSprop(model.parameters(),learning_rate,momentum=0.9,weight_decay=1e-5)
+    lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
+    optimizer = rmsprop.RMSprop(model.parameters(),learning_rate,momentum=0.9,weight_decay=5e-5,alpha=0.9)
     if loadWeight :
        # print(torch.load(modelSavePath + "Model_BN_" + str(trainModelLoad) + ".pth"))
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
@@ -67,12 +66,11 @@ if __name__ == "__main__":
         for m in model.modules():
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.xavier_normal_(m.weight)
-                torch.nn.init.constant_(m.bias, 0.)
             if isinstance(m, nn.Linear):
                 torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.constant_(m.bias, 0.)
     ### Train or Test
-    scheduler = Model.CosineDecaySchedule(5e-6,learning_rate,tMaxIni,1.2,lrDecayRate=decayRate)
+    scheduler = Model.CosineDecaySchedule(8e-6,learning_rate,tMaxIni,1.2,lrDecayRate=decayRate)
     if ifTrain:
         model.train()
         trainingTimes = 0
@@ -82,8 +80,8 @@ if __name__ == "__main__":
                 imagesCuda = images.float().to(device,non_blocking = True)
                 labelsCuda = labels.long().to(device,non_blocking = True)
                 #scheduler.step(e + times // iters)
-                predict , features = model(imagesCuda)
-                oriLoss = lossCri(predict,features,labelsCuda)
+                predict = model(imagesCuda)
+                oriLoss = lossCri(predict,labelsCuda)
                 loss = oriLoss / stepTimes
                 loss.backward()
                 #optimizer.step()
