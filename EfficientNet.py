@@ -54,7 +54,8 @@ class MBConvBlock(nn.Module):
         if self.has_se:
             self._se_reduce = Conv2dDynamicSamePadding(in_channels=expansion_factor * in_channels, out_channels=in_channels, kernel_size=1)
             self._se_expand = Conv2dDynamicSamePadding(in_channels=in_channels, out_channels=expansion_factor * in_channels, kernel_size=1)
-        self.residualP = nn.Parameter(torch.zeros(size=[1],requires_grad=True),requires_grad=True).float()
+        self.residualP = nn.Parameter(torch.ones(size=[1], requires_grad=True), requires_grad=True).float()
+        self.oriP = nn.Parameter(torch.ones(size=[1], requires_grad=True), requires_grad=True).float()
         if in_channels == out_channels:
             self.if_down_sample = False
         else:
@@ -78,12 +79,12 @@ class MBConvBlock(nn.Module):
             if np.random.rand(1) < self.dropRate:
                 return self.down_sample_conv(xOri)
             else:
-                return self.down_sample_conv(xOri + xGate)
+                return self.down_sample_conv(torch.div(xOri + xGate,self.residualP + self.oriP + 1e-6))
         else:
             if np.random.rand(1) < self.dropRate:
                 return xOri
             else:
-                return xOri + xGate
+                return torch.div(xOri + xGate,self.residualP + self.oriP + 1e-6)
 
 class MB_Blocks(nn.Module):
 
@@ -109,26 +110,20 @@ class CBA(nn.Module):
         self.conv = Conv2dDynamicSamePadding(in_channels,outChannels,kernel_size,stride,groups= group)
         self.bn = nn.BatchNorm2d(outChannels,bn_eps,bn_mom)
         self.act = Swish()
-        self.if_res = False
-        if in_channels == outChannels :
-            self.p = nn.Parameter(torch.zeros(size=[1], requires_grad=True), requires_grad=True)
-            self.if_res = True
     def forward(self, x):
-        if self.if_res:
-            return self.act(self.bn(self.conv(x))) * self.p + x
-        else:
-            return self.act(self.bn(self.conv(x)))
+        return self.act(self.bn(self.conv(x)))
+
 
 class BiFPN_Down_Unit (nn.Module):
 
-    def __init__(self,P_high_channels,P_low_channels,inner_channels, layers,eps = 1e-3):
+    def __init__(self,P_high_channels,P_low_channels,inner_channels,eps = 1e-3):
         super(BiFPN_Down_Unit,self).__init__()
-        self.paraHigh = nn.Parameter(torch.zeros(size=[1],requires_grad=True),requires_grad=True)
-        self.paraLow = nn.Parameter(torch.zeros(size=[1],requires_grad=True),requires_grad=True)
+        self.paraHigh = nn.Parameter(torch.ones(size=[1],requires_grad=True),requires_grad=True)
+        self.paraLow = nn.Parameter(torch.ones(size=[1],requires_grad=True),requires_grad=True)
         self.eps = eps
         self.convHighTransChannels = CBA(P_high_channels,inner_channels,1,1,1)
         self.convLowTransChannels = CBA(P_low_channels,inner_channels,1,1,1)
-        self.innerConvBlocks = nn.ModuleList([CBA(inner_channels,inner_channels,3,1,inner_channels) for _ in range(layers)])
+        self.innerConvBlocks = CBA(inner_channels,inner_channels,3,1,inner_channels)
 
 
     def forward(self,P_high, P_low):
@@ -136,24 +131,23 @@ class BiFPN_Down_Unit (nn.Module):
         upSampleHigh = F.interpolate(P_high,size=[P_low.shape[-2],P_low.shape[-1]])
         transHigh = self.convHighTransChannels(upSampleHigh)
         transLow = self.convLowTransChannels(P_low)
-        addedHighLow = torch.div(self.paraHigh * transHigh + self.paraLow * transLow,self.eps + self.paraLow + self.paraHigh)
-        for m in self.innerConvBlocks:
-            addedHighLow = m(addedHighLow)
-        return addedHighLow
+        added = torch.div(self.paraHigh * transHigh + self.paraLow * transLow,self.eps + self.paraLow + self.paraHigh)
+        #added = self.paraHigh * transHigh + self.paraLow * transLow
+        return self.innerConvBlocks(added)
 
 
 class BiFPN_Up_Unit (nn.Module):
 
-    def __init__(self,P_Ori_channels,P_Low_channels,P_Med_channels,inner_channels, layers,eps = 1e-3):
+    def __init__(self,P_Ori_channels,P_Low_channels,P_Med_channels,inner_channels,eps = 1e-6):
         super(BiFPN_Up_Unit,self).__init__()
-        self.paraOri = nn.Parameter(torch.zeros(size=[1],requires_grad=True),requires_grad=True)
-        self.paraLow = nn.Parameter(torch.zeros(size=[1],requires_grad=True),requires_grad=True)
-        self.paraMed = nn.Parameter(torch.zeros(size=[1], requires_grad=True), requires_grad=True)
+        self.paraOri = nn.Parameter(torch.ones(size=[1],requires_grad=True),requires_grad=True)
+        self.paraLow = nn.Parameter(torch.ones(size=[1],requires_grad=True),requires_grad=True)
+        self.paraMed = nn.Parameter(torch.ones(size=[1], requires_grad=True), requires_grad=True)
         self.eps = eps
         self.convOriTransChannels = CBA(P_Ori_channels,inner_channels,1,1,1)
         self.convLowTransChannels = CBA(P_Low_channels, inner_channels, 1, 1, 1)
         self.convMedTransChannels = CBA(P_Med_channels, inner_channels, 1, 1, 1)
-        self.innerConvBlocks = nn.ModuleList([CBA(inner_channels,inner_channels,3,1,inner_channels) for _ in range(layers)])
+        self.innerConvBlocks = CBA(inner_channels,inner_channels,3,1,inner_channels)
 
 
     def forward(self,P_Ori,P_Low,P_Med):
@@ -163,9 +157,8 @@ class BiFPN_Up_Unit (nn.Module):
         transMed = self.convMedTransChannels(P_Med)
         added = torch.div(self.paraLow * transLow + self.paraMed + transMed + self.paraOri * transOri,
                           self.eps + self.paraOri + self.paraMed + self.paraLow)
-        for m in self.innerConvBlocks:
-            added = m(added)
-        return added
+        #added = self.paraLow * transLow + self.paraMed + transMed + self.paraOri * transOri
+        return self.innerConvBlocks(added)
 
 class BiFPN(nn.Module):
     """
@@ -183,15 +176,15 @@ class BiFPN(nn.Module):
         P2_0 -------------------------> P3P2Down-------->
     """
 
-    def __init__(self,P2C,P3C,P4C,P5C,inner_channels, layers):
+    def __init__(self,P2C,P3C,P4C,P5C,inner_channels):
         super(BiFPN,self).__init__()
-        self.P5P4Down = BiFPN_Down_Unit(P5C,P4C,inner_channels,layers)
-        self.P4P3Down = BiFPN_Down_Unit(inner_channels,P3C,inner_channels,layers)
-        self.P3P2Down = BiFPN_Down_Unit(inner_channels,P2C,inner_channels,layers)
+        self.P5P4Down = BiFPN_Down_Unit(P5C,P4C,inner_channels)
+        self.P4P3Down = BiFPN_Down_Unit(inner_channels,P3C,inner_channels)
+        self.P3P2Down = BiFPN_Down_Unit(inner_channels,P2C,inner_channels)
         ##
-        self.P2P3Up = BiFPN_Up_Unit(P3C,inner_channels,inner_channels,inner_channels,layers)
-        self.P3P4Up = BiFPN_Up_Unit(P4C,inner_channels,inner_channels,inner_channels,layers)
-        self.P4P5Up = BiFPN_Down_Unit(inner_channels,P5C,inner_channels,layers)
+        self.P2P3Up = BiFPN_Up_Unit(P3C,inner_channels,inner_channels,inner_channels)
+        self.P3P4Up = BiFPN_Up_Unit(P4C,inner_channels,inner_channels,inner_channels)
+        self.P4P5Up = BiFPN_Down_Unit(inner_channels,P5C,inner_channels)
 
     def forward(self, P2,P3,P4,P5):
         P4Td = self.P5P4Down(P5,P4)
@@ -213,7 +206,7 @@ class EfficientNetReform(nn.Module):
         bn_eps = 0.001
         d = math.ceil(math.pow(1.2,fy))  ## depth
         w = math.ceil(math.pow(1.1,fy))  ## width channels
-        self.r = 64 * math.ceil(math.pow(1.15,fy)) ## resolution
+        self.r = 32 * math.ceil(math.pow(1.15,fy)) ## resolution
         ### stem
         self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=3, stride=1, bias=False)
         self.bn0 = nn.BatchNorm2d(num_features=32 * w, momentum=bn_mom, eps=bn_eps)
@@ -232,16 +225,14 @@ class EfficientNetReform(nn.Module):
         self.block7 = MB_Blocks(192 * w, 320 * w, layers=1 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
         ### BiFPN
         inner_channels = 64 * math.ceil(math.pow(1.35,fy))
-        layers = 3 + fy
-        self.BiFPN1 = BiFPN(40 * w,80 * w,192 * w, 320 * w,inner_channels,layers)
-        self.BiFPN2 = BiFPN(inner_channels,inner_channels,inner_channels, inner_channels,inner_channels,layers)
-        self.BiFPN3 = BiFPN(inner_channels, inner_channels, inner_channels, inner_channels, inner_channels, layers)
+        layers = 2 + math.ceil(math.pow(1.35,fy))
+        self.BiFPN1 = BiFPN(40 * w,80 * w,192 * w, 320 * w,inner_channels)
+        self.BiFPNList = nn.ModuleList([BiFPN(inner_channels,inner_channels,inner_channels,inner_channels,inner_channels) for _ in range(int(layers))])
         ### classify
         if if_classify:
-            self.paras = nn.ParameterList([nn.Parameter(torch.zeros(size=[1],requires_grad=True).float(),requires_grad=True) for _ in range(4)])
+            self.paras = nn.ParameterList([nn.Parameter(torch.ones(size=[1],requires_grad=True).float(),requires_grad=True) for _ in range(4)])
             self.finalConv = CBA(inner_channels,1280,1,1,1)
-            self.dropout = nn.Dropout(p = drop_connect_rate)
-            self.linear = nn.Linear(1280,num_classes,bias=True)
+            self.linear = nn.Linear(1280,num_classes,bias=False)
 
 
     def forward(self,x):
@@ -249,28 +240,65 @@ class EfficientNetReform(nn.Module):
         :param x:
         :return:
         """
-        h , w = x.shape[-2],x.shape[-1]
-        xReshape = F.interpolate(x,size=[h + self.r , w + self.r],mode="bilinear",align_corners=True)
-        xStem = self.bn0(self.conv_stem(xReshape))
+        # h , w = x.shape[-2],x.shape[-1]
+        # xReshape = F.interpolate(x,size=[h + self.r , w + self.r],mode="bilinear",align_corners=True)
+        xStem = self.bn0(self.conv_stem(x))
         p1 = self.block2(self.block1(xStem))
         p2 = self.block3(p1)
         p3 = self.block4(p2)
         p4 = self.block6(self.block5(p3))
         p5 = self.block7(p4)
         B12,B13,B14,B15 = self.BiFPN1(p2,p3,p4,p5)
-        B22, B23, B24, B25 = self.BiFPN2(B12,B13,B14,B15)
-        B32, B33, B34, B35 = self.BiFPN3(B22, B23, B24, B25)
+        for m in self.BiFPNList:
+            B12, B13, B14, B15 = m(B12,B13,B14,B15)
         if self.if_classify:
-            hs,ws = B35.shape[-2],B35.shape[-1]
-            B32D = F.interpolate(B32, size=[hs, ws])
-            B33D = F.interpolate(B33, size=[hs, ws])
-            B34D = F.interpolate(B34, size=[hs, ws])
-            added = self.paras[0] * B32D + self.paras[1] * B33D + self.paras[2] * B34D + self.paras[3] * B35
-            norm = torch.div(added,self.paras[0] + self.paras[1] +self.paras[2] +self.paras[3]+0.0001)
+            hs,ws = B15.shape[-2],B15.shape[-1]
+            #print(B15.shape)
+            B32D = F.interpolate(B12, size=[hs, ws])
+            B33D = F.interpolate(B13, size=[hs, ws])
+            B34D = F.interpolate(B14, size=[hs, ws])
+            added = self.paras[0] * B32D + self.paras[1] * B33D + self.paras[2] * B34D + self.paras[3] * B15
+            #print(added.shape)
+            norm = torch.div(added,self.paras[0] + self.paras[1] + self.paras[2] + self.paras[3] + 0.0001)
             avgTensor = F.adaptive_avg_pool2d(self.finalConv(norm), output_size=[1, 1])
-            return self.linear(self.dropout(torch.squeeze(torch.squeeze(avgTensor,-1),-1)))
+            return self.linear(torch.squeeze(torch.squeeze(avgTensor,-1),-1))
         else:
-            return OrderedDict([("0",B32),("1",B32),("2",B34),("3",B35)])
+            return OrderedDict([("0",B15),("1",B14),("2",B13),("3",B12)])
+
+
+import matplotlib.pyplot as plt
+### Check grad
+def plot_grad_flow(named_parameters):
+    """Plots the gradients flowing through different layers in the net during training.
+    Can be used for checking for possible gradient vanishing / exploding problems.
+
+    Usage: Plug this function in Trainer class after loss.backwards() as
+    "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow"""
+    ave_grads = []
+    layers = []
+    for n, p in named_parameters:
+        if p.requires_grad and ("bias" not in n):
+            layers.append(n)
+            print("########")
+            print(n)
+            if p.grad is not None:
+                print(p.grad.abs().mean())
+                if p.grad.abs().mean() > 2:
+                    ave_grads.append(2)
+                else:
+                    ave_grads.append(p.grad.abs().mean())
+            else:
+                print(0)
+                ave_grads.append(0)
+    plt.plot(ave_grads, alpha=0.3, color="b")
+    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
+    plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+    plt.xlim(xmin=0, xmax=len(ave_grads))
+    plt.xlabel("Layers")
+    plt.ylabel("average gradient")
+    plt.title("Gradient flow")
+    plt.grid(True)
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -302,7 +330,15 @@ if __name__ == "__main__":
     # print(r5.shape)
     ##########
     testInput = torch.randn(size=[5,3,32,32]).float()
-    model = EfficientNetReform(in_channels=3,fy=1)
-    finalDic = model(testInput)
-    print(finalDic)
+    model = EfficientNetReform(in_channels=3,fy=4,if_classify=True)
+    outputs = model(testInput)
+    print(outputs)
+    lossCri = nn.CrossEntropyLoss(reduction="sum")
+    loss = lossCri(outputs, torch.from_numpy(np.array([0,1,2,3,4])).long())
+    loss.backward()
+    torch.nn.utils.clip_grad_value_(model.parameters(), 1.)
+    plot_grad_flow(model.named_parameters())
+    # print(finalDic["1"].shape)
+    # print(finalDic["2"].shape)
+    # print(finalDic["3"].shape)
 
