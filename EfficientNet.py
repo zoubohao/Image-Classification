@@ -9,24 +9,88 @@ class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
 
+class Conv2dDynamicSamePadding(nn.Module):
+    """
+    created by Zylo117
+    The real keras/tensorflow conv2d with same padding
+    """
 
-class Conv2dDynamicSamePadding(nn.Conv2d):
-    """ 2D Convolutions like TensorFlow, for a dynamic image size """
+    def __init__(self, in_channels, out_channels, kernel_size, stride = 1, groups=1, bias=True):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride,
+                              bias=bias, groups=groups)
+        self.stride = self.conv.stride
+        self.kernel_size = self.conv.kernel_size
+        self.dilation = self.conv.dilation
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1, bias=True):
-        super().__init__(in_channels, out_channels, kernel_size, stride, 0, dilation, groups, bias)
-        self.stride = self.stride if len(self.stride) == 2 else [self.stride[0]] * 2
+        if isinstance(self.stride, int):
+            self.stride = [self.stride] * 2
+        elif len(self.stride) == 1:
+            self.stride = [self.stride[0]] * 2
+
+        if isinstance(self.kernel_size, int):
+            self.kernel_size = [self.kernel_size] * 2
+        elif len(self.kernel_size) == 1:
+            self.kernel_size = [self.kernel_size[0]] * 2
 
     def forward(self, x):
-        ih, iw = x.size()[-2:]
-        kh, kw = self.weight.size()[-2:]
-        sh, sw = self.stride
-        oh, ow = math.ceil(ih / sh), math.ceil(iw / sw)
-        pad_h = max((oh - 1) * self.stride[0] + (kh - 1) * self.dilation[0] + 1 - ih, 0)
-        pad_w = max((ow - 1) * self.stride[1] + (kw - 1) * self.dilation[1] + 1 - iw, 0)
-        if pad_h > 0 or pad_w > 0:
-            x = F.pad(x, [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2])
-        return F.conv2d(x, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        h, w = x.shape[-2:]
+        h_step = math.ceil(w / self.stride[1])
+        v_step = math.ceil(h / self.stride[0])
+        h_cover_len = self.stride[1] * (h_step - 1) + 1 + (self.kernel_size[1] - 1)
+        v_cover_len = self.stride[0] * (v_step - 1) + 1 + (self.kernel_size[0] - 1)
+        extra_h = h_cover_len - w
+        extra_v = v_cover_len - h
+        left = extra_h // 2
+        right = extra_h - left
+        top = extra_v // 2
+        bottom = extra_v - top
+        x = F.pad(x, [left, right, top, bottom])
+        x = self.conv(x)
+        return x
+
+class MaxPool2dStaticSamePadding(nn.Module):
+    """
+    created by Zylo117
+    The real keras/tensorflow MaxPool2d with same padding
+    """
+
+    def __init__(self, kernel_size, stride=None):
+        super().__init__()
+        self.pool = nn.MaxPool2d(kernel_size, stride=stride)
+        self.stride = self.pool.stride
+        self.kernel_size = self.pool.kernel_size
+
+        if isinstance(self.stride, int):
+            self.stride = [self.stride] * 2
+        elif len(self.stride) == 1:
+            self.stride = [self.stride[0]] * 2
+
+        if isinstance(self.kernel_size, int):
+            self.kernel_size = [self.kernel_size] * 2
+        elif len(self.kernel_size) == 1:
+            self.kernel_size = [self.kernel_size[0]] * 2
+
+    def forward(self, x):
+        h, w = x.shape[-2:]
+
+        h_step = math.ceil(w / self.stride[1])
+        v_step = math.ceil(h / self.stride[0])
+        h_cover_len = self.stride[1] * (h_step - 1) + 1 + (self.kernel_size[1] - 1)
+        v_cover_len = self.stride[0] * (v_step - 1) + 1 + (self.kernel_size[0] - 1)
+
+        extra_h = h_cover_len - w
+        extra_v = v_cover_len - h
+
+        left = extra_h // 2
+        right = extra_h - left
+        top = extra_v // 2
+        bottom = extra_v - top
+
+        x = F.pad(x, [left, right, top, bottom])
+
+        x = self.pool(x)
+        return x
 
 
 class MBConvBlock(nn.Module):
@@ -38,17 +102,19 @@ class MBConvBlock(nn.Module):
         self.dropRate = dropRate
         self.has_se = has_se
         self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,
-                                                      1,1,groups=1,bias=False)
+                                                      1,1,groups=1)
         self.bn_expansion = nn.BatchNorm2d(in_channels * expansion_factor,
                                            eps=bn_eps,momentum=bn_mom)
         self.dwiseConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,
                                                   in_channels * expansion_factor,kernel_size,
                                                   stride=1,groups=in_channels * expansion_factor,
                                                   bias=False)
+        self.point = Conv2dDynamicSamePadding(in_channels * expansion_factor,
+                                                  in_channels * expansion_factor,kernel_size=1,stride=1)
         self.bn_Dwise = nn.BatchNorm2d(expansion_factor * in_channels,
                                        bn_eps,momentum=bn_mom)
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,
-                                                   in_channels,1,1,bias=False)
+                                                   in_channels,1,1)
         self.bn_reduce = nn.BatchNorm2d(in_channels,bn_eps,bn_mom)
         self.blockACT = Swish()
         if self.has_se:
@@ -64,16 +130,16 @@ class MBConvBlock(nn.Module):
 
 
     def forward(self, x):
-        xOri = x.clone()
+        xOri = x
         xExpansion = self.blockACT(self.bn_expansion(self.expansionConv(x)))
-        xDepthWise = self.blockACT(self.bn_Dwise(self.dwiseConv(xExpansion)))
+        xDepthWise = self.blockACT(self.bn_Dwise(self.point(self.dwiseConv(xExpansion))))
         xSE = xDepthWise.clone()
         # Squeeze and Excitation
         if self.has_se:
             x_squeezed = F.adaptive_avg_pool2d(xSE, [1,1])
             x_squeezed = self._se_expand(self.blockACT(self._se_reduce(x_squeezed)))
             xSE = torch.sigmoid(x_squeezed) * xSE
-        xReduce = self.blockACT(self.bn_reduce(self.reduceConv(xSE)))
+        xReduce = self.bn_reduce(self.reduceConv(xSE))
         xGate = xReduce * torch.abs(self.residualP)
         if self.if_down_sample:
             if np.random.rand(1) < self.dropRate:
@@ -93,10 +159,10 @@ class MB_Blocks(nn.Module):
     def __init__(self,in_channels,out_channels,layers,kernel_size = 3,drop_connect_rate = 0.2):
         super(MB_Blocks,self).__init__()
         self.blocks = nn.ModuleList([])
-        self.blocks.append(MBConvBlock(in_channels,out_channels,kernel_size,drop_connect_rate))
         if layers > 1:
             for _ in range(layers - 1):
-                self.blocks.append(MBConvBlock(out_channels, out_channels,kernel_size,drop_connect_rate))
+                self.blocks.append(MBConvBlock(in_channels, in_channels,kernel_size,drop_connect_rate))
+        self.blocks.append(MBConvBlock(in_channels, out_channels, kernel_size, drop_connect_rate))
 
     def forward(self, x):
         for m in self.blocks:
@@ -109,12 +175,13 @@ class CBA(nn.Module):
         super(CBA,self).__init__()
         bn_mom = 1 - 0.99
         bn_eps = 0.001
-        self.conv = Conv2dDynamicSamePadding(in_channels,outChannels,kernel_size,stride,groups= group)
+        self.conv = Conv2dDynamicSamePadding(in_channels,in_channels,kernel_size,stride,groups= group,bias=False)
+        self.point = Conv2dDynamicSamePadding(in_channels,outChannels,kernel_size=1,stride=1)
         self.bn = nn.BatchNorm2d(outChannels,bn_eps,bn_mom)
         self.act = Swish()
 
     def forward(self, x):
-        return self.act(self.bn(self.conv(x)))
+        return self.act(self.bn(self.point(self.conv(x))))
 
 
 class BiFPN_Down_Unit (nn.Module):
@@ -136,7 +203,6 @@ class BiFPN_Down_Unit (nn.Module):
         transLow = self.convLowTransChannels(P_low)
         added = torch.div(torch.abs(self.paraHigh) * transHigh + torch.abs(self.paraLow) * transLow,
                           self.eps + torch.abs(self.paraLow) + torch.abs(self.paraHigh))
-        #added = self.paraHigh * transHigh + self.paraLow * transLow
         return self.innerConvBlocks(added)
 
 
@@ -152,10 +218,12 @@ class BiFPN_Up_Unit (nn.Module):
         self.convLowTransChannels = CBA(P_Low_channels, inner_channels, 1, 1, 1)
         self.convMedTransChannels = CBA(P_Med_channels, inner_channels, 1, 1, 1)
         self.innerConvBlocks = CBA(inner_channels,inner_channels,3,1,inner_channels)
+        self.downSampling = MaxPool2dStaticSamePadding(kernel_size=3,stride=2)
 
 
     def forward(self,P_Ori,P_Low,P_Med):
-        downSample = F.interpolate(P_Low,size=[P_Ori.shape[-2],P_Ori.shape[-1]])
+        downSample = self.downSampling(P_Low)
+        downSample = F.interpolate(downSample,size=[P_Ori.shape[-2],P_Ori.shape[-1]])
         transOri = self.convOriTransChannels(P_Ori)
         transLow = self.convLowTransChannels(downSample)
         transMed = self.convMedTransChannels(P_Med)
@@ -210,7 +278,6 @@ class EfficientNetReform(nn.Module):
         bn_eps = 0.001
         d = math.ceil(math.pow(1.2,fy))  ## depth
         w = math.ceil(math.pow(1.1,fy))  ## width channels
-        self.r = math.ceil(math.pow(1.15,fy)) ## resolution
         ### stem
         self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=3, stride=1, bias=False)
         self.bn0 = nn.BatchNorm2d(num_features=32 * w, momentum=bn_mom, eps=bn_eps)
@@ -244,9 +311,8 @@ class EfficientNetReform(nn.Module):
         :param x:
         :return:
         """
-        h , w = x.shape[-2],x.shape[-1]
-        xReshape = F.interpolate(x,size=[h  * self.r , w  *self.r],mode="bilinear",align_corners=True)
-        xStem = self.bn0(self.conv_stem(xReshape))
+        #print(x.shape)
+        xStem = self.bn0(self.conv_stem(x))
         p1 = self.block2(self.block1(xStem))
         p2 = self.block3(p1)
         p3 = self.block4(p2)
@@ -282,9 +348,9 @@ def plot_grad_flow(named_parameters):
     layers = []
     for n, p in named_parameters:
         if p.requires_grad and ("bias" not in n):
-            layers.append(n)
+            layers.append(n.split(".")[-1])
             print("########")
-            print(n)
+            print(n.split(".")[0:-2])
             if p.grad is not None:
                 print(p.grad.abs().mean())
                 if p.grad.abs().mean() > 2:

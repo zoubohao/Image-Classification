@@ -16,36 +16,39 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    batchSize = 16
-    tMaxIni = 1800
+    batchSize = 8
+    tMaxIni = 1000
     growthRate = 32
     blocks = [6,12,24,16]
-    learning_rate = 5e-4
+    learning_rate = 2.57e-4
     labelsNumber = 10
     ifUseBn = True
     ifTrain = True
     epoch = 25
     displayTimes = 25
     modelSavePath = "./"
-    loadWeight = True
+    loadWeight = False
     trainModelLoad = 4
     testModelLoad = 10
-    decayRate = 0.91
+    decayRate = 0.97
     fy = 4
     stepTimes = 1
-    saveTimes = 5000
+    saveTimes = 4000
     clip_value = 20
     ### Data pre-processing
+    import math
     transformationTrain = tv.transforms.Compose([
-        tv.transforms.RandomHorizontalFlip(p = 0.25),
-        tv.transforms.RandomVerticalFlip(p = 0.334),
+        tv.transforms.Resize(size=[math.ceil(math.pow(1.15,fy)) * 32,math.ceil(math.pow(1.15,fy)) * 32]),
+        # tv.transforms.RandomHorizontalFlip(p = 0.25),
+        # tv.transforms.RandomVerticalFlip(p = 0.334),
         #tv.transforms.RandomApply([tv.transforms.RandomResizedCrop(32)],p=0.5),
         tv.transforms.ToTensor(),
-        tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        #tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
     transformationTest = tv.transforms.Compose([
+        tv.transforms.Resize(size=[math.ceil(math.pow(1.15, fy)) * 32, math.ceil(math.pow(1.15, fy)) * 32]),
         tv.transforms.ToTensor(),
-        tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        #tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
     #cifarDataTrainSet = tv.datasets.CIFAR100(root="./Cifar100/",train=True,download=True,transform=transformation)
     #cifarDataTestSet = tv.datasets.CIFAR100(root="./Cifar100/",train=False,download=True)
