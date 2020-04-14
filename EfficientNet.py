@@ -74,17 +74,19 @@ class MBConvBlock(nn.Module):
             x_squeezed = self._se_expand(self.blockACT(self._se_reduce(x_squeezed)))
             xSE = torch.sigmoid(x_squeezed) * xSE
         xReduce = self.blockACT(self.bn_reduce(self.reduceConv(xSE)))
-        xGate = xReduce * self.residualP
+        xGate = xReduce * torch.abs(self.residualP)
         if self.if_down_sample:
             if np.random.rand(1) < self.dropRate:
                 return self.down_sample_conv(xOri)
             else:
-                return self.down_sample_conv(torch.div(xOri + xGate,self.residualP + self.oriP + 1e-6))
+                return self.down_sample_conv(torch.div(xOri * torch.abs(self.oriP) + xGate,
+                                                       torch.abs(self.residualP) + torch.abs(self.oriP) + 1e-6))
         else:
             if np.random.rand(1) < self.dropRate:
                 return xOri
             else:
-                return torch.div(xOri + xGate,self.residualP + self.oriP + 1e-6)
+                return torch.div(xOri * torch.abs(self.oriP) + xGate,
+                                 torch.abs(self.residualP) + torch.abs(self.oriP) + 1e-6)
 
 class MB_Blocks(nn.Module):
 
@@ -110,6 +112,7 @@ class CBA(nn.Module):
         self.conv = Conv2dDynamicSamePadding(in_channels,outChannels,kernel_size,stride,groups= group)
         self.bn = nn.BatchNorm2d(outChannels,bn_eps,bn_mom)
         self.act = Swish()
+
     def forward(self, x):
         return self.act(self.bn(self.conv(x)))
 
@@ -131,7 +134,8 @@ class BiFPN_Down_Unit (nn.Module):
         upSampleHigh = F.interpolate(P_high,size=[P_low.shape[-2],P_low.shape[-1]])
         transHigh = self.convHighTransChannels(upSampleHigh)
         transLow = self.convLowTransChannels(P_low)
-        added = torch.div(self.paraHigh * transHigh + self.paraLow * transLow,self.eps + self.paraLow + self.paraHigh)
+        added = torch.div(torch.abs(self.paraHigh) * transHigh + torch.abs(self.paraLow) * transLow,
+                          self.eps + torch.abs(self.paraLow) + torch.abs(self.paraHigh))
         #added = self.paraHigh * transHigh + self.paraLow * transLow
         return self.innerConvBlocks(added)
 
@@ -155,8 +159,8 @@ class BiFPN_Up_Unit (nn.Module):
         transOri = self.convOriTransChannels(P_Ori)
         transLow = self.convLowTransChannels(downSample)
         transMed = self.convMedTransChannels(P_Med)
-        added = torch.div(self.paraLow * transLow + self.paraMed + transMed + self.paraOri * transOri,
-                          self.eps + self.paraOri + self.paraMed + self.paraLow)
+        added = torch.div(torch.abs(self.paraLow) * transLow + torch.abs(self.paraMed) + transMed + torch.abs(self.paraOri) * transOri,
+                          self.eps + torch.abs(self.paraOri) + torch.abs(self.paraMed) + torch.abs(self.paraLow))
         #added = self.paraLow * transLow + self.paraMed + transMed + self.paraOri * transOri
         return self.innerConvBlocks(added)
 
@@ -257,9 +261,9 @@ class EfficientNetReform(nn.Module):
             B32D = F.interpolate(B12, size=[hs, ws])
             B33D = F.interpolate(B13, size=[hs, ws])
             B34D = F.interpolate(B14, size=[hs, ws])
-            added = self.paras[0] * B32D + self.paras[1] * B33D + self.paras[2] * B34D + self.paras[3] * B15
+            added = torch.abs(self.paras[0]) * B32D + torch.abs(self.paras[1]) * B33D + torch.abs(self.paras[2]) * B34D + torch.abs(self.paras[3]) * B15
             #print(added.shape)
-            norm = torch.div(added,self.paras[0] + self.paras[1] + self.paras[2] + self.paras[3] + 0.0001)
+            norm = torch.div(added,torch.abs(self.paras[0]) + torch.abs(self.paras[1]) + torch.abs(self.paras[2]) + torch.abs(self.paras[3]) + 0.0001)
             avgTensor = F.adaptive_avg_pool2d(self.finalConv(norm), output_size=[1, 1])
             return self.linear(torch.squeeze(torch.squeeze(avgTensor,-1),-1))
         else:

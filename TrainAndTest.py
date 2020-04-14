@@ -17,24 +17,24 @@ class DataLoaderX(d.DataLoader):
 if __name__ == "__main__":
     ### config
     batchSize = 16
-    tMaxIni = 900
+    tMaxIni = 1800
     growthRate = 32
     blocks = [6,12,24,16]
-    learning_rate = 1e-3
+    learning_rate = 5e-4
     labelsNumber = 10
     ifUseBn = True
     ifTrain = True
     epoch = 25
     displayTimes = 25
     modelSavePath = "./"
-    loadWeight = False
-    trainModelLoad = 3
+    loadWeight = True
+    trainModelLoad = 4
     testModelLoad = 10
-    decayRate = 0.85
+    decayRate = 0.91
     fy = 4
-    stepTimes = 2
+    stepTimes = 1
     saveTimes = 5000
-    clip_value = 10
+    clip_value = 20
     ### Data pre-processing
     transformationTrain = tv.transforms.Compose([
         tv.transforms.RandomHorizontalFlip(p = 0.25),
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     print(model)
     #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
     #lossCri = nn.CrossEntropyLoss(reduction="sum")
-    lossCri = nn.CrossEntropyLoss().to(device)
+    lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
     optimizer = rmsprop.RMSprop(model.parameters(),learning_rate,momentum=0.9,weight_decay=1e-5)
     if loadWeight :
        # print(torch.load(modelSavePath + "Model_BN_" + str(trainModelLoad) + ".pth"))
