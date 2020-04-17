@@ -54,48 +54,6 @@ class Conv2dStaticSamePadding(nn.Module):
         return x
 
 
-class MaxPool2dStaticSamePadding(nn.Module):
-    """
-    created by Zylo117
-    The real keras/tensorflow MaxPool2d with same padding
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.pool = nn.MaxPool2d(*args, **kwargs)
-        self.stride = self.pool.stride
-        self.kernel_size = self.pool.kernel_size
-
-        if isinstance(self.stride, int):
-            self.stride = [self.stride] * 2
-        elif len(self.stride) == 1:
-            self.stride = [self.stride[0]] * 2
-
-        if isinstance(self.kernel_size, int):
-            self.kernel_size = [self.kernel_size] * 2
-        elif len(self.kernel_size) == 1:
-            self.kernel_size = [self.kernel_size[0]] * 2
-
-    def forward(self, x):
-        h, w = x.shape[-2:]
-
-        h_step = math.ceil(w / self.stride[1])
-        v_step = math.ceil(h / self.stride[0])
-        h_cover_len = self.stride[1] * (h_step - 1) + 1 + (self.kernel_size[1] - 1)
-        v_cover_len = self.stride[0] * (v_step - 1) + 1 + (self.kernel_size[0] - 1)
-
-        extra_h = h_cover_len - w
-        extra_v = v_cover_len - h
-
-        left = extra_h // 2
-        right = extra_h - left
-        top = extra_v // 2
-        bottom = extra_v - top
-
-        x = F.pad(x, [left, right, top, bottom])
-
-        x = self.pool(x)
-        return x
 
 class SeparableConvBlock(nn.Module):
     """
@@ -279,8 +237,6 @@ class BiFPN(nn.Module):
         p5_out = self.conv5_down( self.swish(weight[0] * p5_in + weight[1] * self.matching(self.p5_downsample(p4_out),p5_in.shape[-2:])))
 
         return p3_out, p4_out, p5_out
-
-
 
 
 

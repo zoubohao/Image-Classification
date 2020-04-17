@@ -6,8 +6,8 @@ from EfficientNet import EfficientNetReform
 from BiFPN import BiFPN
 
 writer = SummaryWriter()
-model = EfficientNetReform(3,2,2)
-testInput = torch.randn(size=[8,3,32 * 2,32 * 2]).float()
+model = EfficientNetReform(3,1,1)
+testInput = torch.randn(size=[8,3,32,32]).float()
 writer.add_graph(model,testInput)
 writer.close()
 
