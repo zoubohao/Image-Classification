@@ -16,21 +16,21 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    w = 2
-    d = 2
-    batchSize = 12
+    w = 4
+    d = 4
+    batchSize = 18
     tMaxIni = 1200
     growthRate = 32
     blocks = [6,12,24,16]
-    learning_rate = 2.57e-4
+    learning_rate = 7e-4
     minLR = 2e-6
     labelsNumber = 10
     ifUseBn = True
     ifTrain = True
     epoch = 50
     displayTimes = 25
-    modelSavePath = "./"
-    loadWeight = True
+    modelSavePath = "./Model_Weight/"
+    loadWeight = False
     trainModelLoad = 7
     testModelLoad = 0
     decayRate = 0.92
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     ### Data pre-processing
     import math
     transformationTrain = tv.transforms.Compose([
-        tv.transforms.Resize(size=[32 * 2,32 * 2]),
+        #tv.transforms.Resize(size=[32 * 2,32 * 2]),
         # tv.transforms.RandomHorizontalFlip(p = 0.25),
         # tv.transforms.RandomVerticalFlip(p = 0.334),
         #tv.transforms.RandomApply([tv.transforms.RandomResizedCrop(32)],p=0.5),
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
     transformationTest = tv.transforms.Compose([
-        tv.transforms.Resize(size=[32 * 2,32 * 2]),
+        #tv.transforms.Resize(size=[32 * 2,32 * 2]),
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
@@ -98,7 +98,7 @@ if __name__ == "__main__":
                     print("Predict is : ",predict[0:3])
                     print("Labels are : ",labelsCuda[0:3])
                     print("Learning rate is ", optimizer.state_dict()['param_groups'][0]["lr"])
-                    print("Loss is ", oriLoss)
+                    print("Loss is ", oriLoss / batchSize + 0.)
                     print("Epoch : ", e)
                     print("Training time is ", trainingTimes)
                 trainingTimes += 1

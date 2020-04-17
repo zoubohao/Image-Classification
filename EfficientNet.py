@@ -139,7 +139,7 @@ class EfficientNetReform(nn.Module):
         ### classify
         self.classify = classify
         if classify :
-            self.linear = nn.Linear(256, num_classes)
+            self.linear = nn.Linear(128 * 3, num_classes)
 
 
     def forward(self,x):
@@ -200,7 +200,7 @@ def plot_grad_flow(named_parameters):
 if __name__ == "__main__":
     from torch.optim import rmsprop
     testInput = torch.randn(size=[5,3,32 * 2,32 * 2]).float()
-    model = EfficientNetReform(in_channels=3,w=2,d=2)
+    model = EfficientNetReform(in_channels=3,w=4,d=4)
     optimizer = rmsprop.RMSprop(model.parameters(), 5e-4, momentum=0.9, weight_decay=1e-5)
     outputs = model(testInput)
     print(outputs)
