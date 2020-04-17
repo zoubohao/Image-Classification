@@ -118,29 +118,28 @@ class EfficientNetReform(nn.Module):
     def __init__(self,in_channels,w = 3,d = 3,drop_connect_rate = 0.2,num_classes = 10,classify = True):
         super(EfficientNetReform,self).__init__()
         ### stem
-        self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=3, stride=1, bias=False)
+        self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=7, stride=1, bias=False)
         self.bn0 = nn.BatchNorm2d(num_features=32 * w, momentum=0.001, eps=0.001)
         ### blocks
         ### r1
-        self.block1 = MB_Blocks(32 * w, 32 * w, layers=1 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
-        self.block2 = MB_Blocks(32 * w, 32 * w, layers=2 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
-        self.block3 = MB_Blocks(32 * w, 32 * w, layers=2 * d, kernel_size=5, drop_connect_rate=drop_connect_rate)
-        self.block4 = MB_Blocks(32 * w, 80 * w, layers=3 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
+        self.block1 = MB_Blocks(32 * w, 32 * w, layers=1 * d, kernel_size=7, drop_connect_rate=drop_connect_rate)
+        self.block2 = MB_Blocks(32 * w, 40 * w, layers=2 * d, kernel_size=5, drop_connect_rate=drop_connect_rate)
         ### r2
-        self.block5 = MB_Blocks(80 * w, 192 * w, layers=3 * d, kernel_size=5, drop_connect_rate=drop_connect_rate)
-        self.block6 = MB_Blocks(192 * w, 192 * w, layers=4 * d, kernel_size=5, drop_connect_rate=drop_connect_rate)
+        self.block3 = MB_Blocks(40 * w, 40 * w, layers=2 * d, kernel_size=5, drop_connect_rate=drop_connect_rate)
+        self.block4 = MB_Blocks(40 * w, 80 * w, layers=3 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
         ### r3
-        self.block7 = MB_Blocks(192 * w, 320 * w, layers=1 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
-        self.block8 = MB_Blocks(320 * w, 320 * w, layers=1 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
+        self.block5 = MB_Blocks(80 * w, 80 * w, layers=3 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
+        self.block6 = MB_Blocks(80 * w, 160 * w, layers=4 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
+        ### r4
+        self.block7 = MB_Blocks(160 * w, 320 * w, layers=3 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
+        self.block8 = MB_Blocks(320 * w, 320 * w, layers=2 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
         ### BiFPN
-        self.BifpnFirst = BiFPN(num_channels=64 * 2, conv_channels=[80 * w,192 * w,320 * w],first_time=True)
-        self.Bifpn = BiFPN(64  * 2,conv_channels=[],first_time=False)
+        self.BifpnFirst = BiFPN(num_channels=128 * 2, conv_channels=[80 * w,160 * w,320 * w],first_time=True)
+        self.Bifpn = BiFPN(128  * 2,conv_channels=[],first_time=False)
         ### classify
         self.classify = classify
         if classify :
-            self.linearTrans = nn.Linear(64 * 2, 1280, bias=True)
-            self.bnL = nn.BatchNorm1d(num_features=1280, eps=1e-3, momentum=0.01)
-            self.linear = nn.Linear(1280, num_classes, bias=False)
+            self.linear = nn.Linear(256, num_classes)
 
 
     def forward(self,x):
@@ -150,11 +149,17 @@ class EfficientNetReform(nn.Module):
         """
         #print(x.shape)
         xStem = Swish(self.bn0(self.conv_stem(x)))
-        p1 = self.block4(self.block3(self.block2(self.block1(xStem))))
-        p2 = self.block6(self.block5(p1))
-        p3 = self.block8(self.block7(p2))
-        rP3, rP4, rP5, rP6, rP7 = self.BifpnFirst(p1,p2,p3)
+        p1 = self.block2(self.block1(xStem))
+        p2 = self.block4(self.block3(p1))
+        p3 = self.block6(self.block5(p2))
+        p4 = self.block8(self.block7(p3))
+        rP3, rP4, rP5, rP6, rP7 = self.BifpnFirst(p2,p3,p4)
         rP3, rP4, rP5, rP6, rP7 = self.Bifpn(rP3, rP4, rP5, rP6, rP7)
+        #print(rP3.shape)
+        #print(rP4.shape)
+        #print(rP5.shape)
+        #print(rP6.shape)
+        #print(rP7.shape)
         if self.classify:
             feat1 = F.adaptive_avg_pool2d(rP3,output_size=[1,1])
             feat2 = F.adaptive_avg_pool2d(rP4,output_size=[1,1])
@@ -162,7 +167,7 @@ class EfficientNetReform(nn.Module):
             feat4 = F.adaptive_avg_pool2d(rP6,output_size=[1,1])
             feat5 = F.adaptive_avg_pool2d(rP7,output_size=[1,1])
             featFinal = feat1 + feat2 + feat3 + feat4 + feat5
-            return self.linear(Swish(self.bnL(self.linearTrans(torch.squeeze(torch.squeeze(F.adaptive_avg_pool2d(featFinal, [1, 1]), -1), -1)))))
+            return self.linear(torch.squeeze(torch.squeeze(featFinal, -1), -1))
         else:
             return OrderedDict([("0",rP7),("1",rP6),("2",rP5),("3",rP4),("4",rP3)])
 
@@ -201,7 +206,7 @@ def plot_grad_flow(named_parameters):
 
 if __name__ == "__main__":
     from torch.optim import rmsprop
-    testInput = torch.randn(size=[5,3,32,32]).float()
+    testInput = torch.randn(size=[5,3,32 * 2,32 * 2]).float()
     model = EfficientNetReform(in_channels=3,w=2,d=2)
     optimizer = rmsprop.RMSprop(model.parameters(), 5e-4, momentum=0.9, weight_decay=1e-5)
     outputs = model(testInput)

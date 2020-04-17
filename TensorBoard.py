@@ -4,11 +4,10 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from EfficientNet import EfficientNetReform
 from BiFPN import BiFPN
-import numpy as np
 
 writer = SummaryWriter()
 model = EfficientNetReform(3,2,2)
-testInput = torch.randn(size=[8,3,32,32]).float()
+testInput = torch.randn(size=[8,3,32 * 2,32 * 2]).float()
 writer.add_graph(model,testInput)
 writer.close()
 

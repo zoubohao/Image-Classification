@@ -18,29 +18,29 @@ if __name__ == "__main__":
     ### config
     w = 2
     d = 2
-    batchSize = 25
+    batchSize = 12
     tMaxIni = 1200
     growthRate = 32
     blocks = [6,12,24,16]
-    learning_rate = 5e-4
+    learning_rate = 1e-4
     minLR = 1e-6
     labelsNumber = 10
     ifUseBn = True
     ifTrain = True
-    epoch = 100
+    epoch = 50
     displayTimes = 25
     modelSavePath = "./"
-    loadWeight = False
-    trainModelLoad = 19
-    testModelLoad = 10
+    loadWeight = True
+    trainModelLoad = 7
+    testModelLoad = 0
     decayRate = 0.9
     stepTimes = 1
-    saveTimes = 2000
+    saveTimes = 2500
     # clip_value = 20
     ### Data pre-processing
     import math
     transformationTrain = tv.transforms.Compose([
-        #tv.transforms.Resize(size=[32,32]),
+        tv.transforms.Resize(size=[32 * 2,32 * 2]),
         # tv.transforms.RandomHorizontalFlip(p = 0.25),
         # tv.transforms.RandomVerticalFlip(p = 0.334),
         #tv.transforms.RandomApply([tv.transforms.RandomResizedCrop(32)],p=0.5),
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
     transformationTest = tv.transforms.Compose([
-        #tv.transforms.Resize(size=[32,32]),
+        tv.transforms.Resize(size=[32 * 2,32 * 2]),
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
 
     ### model construct
-    model = EfficientNet.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.2,w=w,d=d).to(device)
+    model = EfficientNet.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
     print(model)
     #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
     lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
