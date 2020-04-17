@@ -4,6 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from EfficientNet import EfficientNetReform
 from BiFPN import BiFPN
+import numpy as np
 
 writer = SummaryWriter()
 model = EfficientNetReform(3,2,2)
