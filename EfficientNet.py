@@ -60,7 +60,7 @@ class Conv2dDynamicSamePadding(nn.Module):
 
 class MBConvBlock(nn.Module):
 
-    def __init__(self, in_channels,out_channels,kernel_size = 3,dropRate = 0.2,expansion_factor = 3):
+    def __init__(self, in_channels,out_channels,kernel_size = 3,dropRate = 0.2,expansion_factor = 2):
         super().__init__()
         self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1,bias=False)
         self.bn_expansion = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
@@ -118,7 +118,7 @@ class EfficientNetReform(nn.Module):
     def __init__(self,in_channels,w = 3,d = 3,drop_connect_rate = 0.2,num_classes = 10,classify = True):
         super(EfficientNetReform,self).__init__()
         ### stem
-        self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=7, stride=1, bias=False)
+        self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=7, stride=2)
         self.bn0 = nn.BatchNorm2d(num_features=32 * w, momentum=0.001, eps=0.001)
         ### blocks
         ### r1
@@ -134,8 +134,8 @@ class EfficientNetReform(nn.Module):
         self.block7 = MB_Blocks(160 * w, 320 * w, layers=3 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
         self.block8 = MB_Blocks(320 * w, 320 * w, layers=2 * d, kernel_size=3, drop_connect_rate=drop_connect_rate)
         ### BiFPN
-        self.BifpnFirst = BiFPN(num_channels=128 * 2, conv_channels=[80 * w,160 * w,320 * w],first_time=True)
-        self.Bifpn = BiFPN(128  * 2,conv_channels=[],first_time=False)
+        self.BifpnFirst = BiFPN(num_channels=128 * 3, conv_channels=[80 * w,160 * w,320 * w],first_time=True)
+        self.Bifpn = BiFPN(128 * 3,conv_channels=[],first_time=False)
         ### classify
         self.classify = classify
         if classify :
@@ -153,23 +153,16 @@ class EfficientNetReform(nn.Module):
         p2 = self.block4(self.block3(p1))
         p3 = self.block6(self.block5(p2))
         p4 = self.block8(self.block7(p3))
-        rP3, rP4, rP5, rP6, rP7 = self.BifpnFirst(p2,p3,p4)
-        rP3, rP4, rP5, rP6, rP7 = self.Bifpn(rP3, rP4, rP5, rP6, rP7)
-        #print(rP3.shape)
-        #print(rP4.shape)
-        #print(rP5.shape)
-        #print(rP6.shape)
-        #print(rP7.shape)
+        rP3, rP4, rP5 = self.BifpnFirst(p2,p3,p4)
+        rP3, rP4, rP5 = self.Bifpn(rP3, rP4, rP5)
         if self.classify:
             feat1 = F.adaptive_avg_pool2d(rP3,output_size=[1,1])
             feat2 = F.adaptive_avg_pool2d(rP4,output_size=[1,1])
             feat3 = F.adaptive_avg_pool2d(rP5,output_size=[1,1])
-            feat4 = F.adaptive_avg_pool2d(rP6,output_size=[1,1])
-            feat5 = F.adaptive_avg_pool2d(rP7,output_size=[1,1])
-            featFinal = feat1 + feat2 + feat3 + feat4 + feat5
+            featFinal = feat1 + feat2 + feat3
             return self.linear(torch.squeeze(torch.squeeze(featFinal, -1), -1))
         else:
-            return OrderedDict([("0",rP7),("1",rP6),("2",rP5),("3",rP4),("4",rP3)])
+            return OrderedDict([("0",rP5),("1",rP4),("2",rP3)])
 
 
 import matplotlib.pyplot as plt

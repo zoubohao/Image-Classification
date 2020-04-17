@@ -22,8 +22,8 @@ if __name__ == "__main__":
     tMaxIni = 1200
     growthRate = 32
     blocks = [6,12,24,16]
-    learning_rate = 1e-4
-    minLR = 1e-6
+    learning_rate = 2.57e-4
+    minLR = 2e-6
     labelsNumber = 10
     ifUseBn = True
     ifTrain = True
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     loadWeight = True
     trainModelLoad = 7
     testModelLoad = 0
-    decayRate = 0.9
+    decayRate = 0.92
     stepTimes = 1
     saveTimes = 2500
     # clip_value = 20

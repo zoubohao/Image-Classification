@@ -25,8 +25,8 @@ import torch
 # print(resize)
 # print(upSampling.view([h * 2,w * 2,1]))
 
-import numpy as np
-ones = np.ones(shape=[ 1048576, 1048576],dtype=np.float32)
+p4_Up = torch.nn.ConvTranspose2d(32,32,3,2,padding=[1,1],output_padding=[1,1],groups=32)
+print(p4_Up(torch.randn(size=[5,32,17,17]).float()).shape)
 
 
 
