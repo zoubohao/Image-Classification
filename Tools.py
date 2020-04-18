@@ -231,3 +231,11 @@ def plot_grad_flow(named_parameters):
     plt.title("Gradient flow")
     plt.grid(True)
     plt.show()
+
+class Mish(nn.Module):
+
+    def __init__(self):
+        super(Mish,self).__init__()
+
+    def forward(self, x):
+        return x * torch.tanh(F.softplus(x))

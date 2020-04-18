@@ -1,65 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-
-class CosineDecaySchedule :
-
-    def __init__(self,lrMin,lrMax,tMaxIni,factor,lrDecayRate):
-        """
-        :param lrMin: The min learning rate in one schedule
-        :param lrMax: The max learning rate in one schedule
-        :param tMaxIni: The initial max training times in one schedule
-        :param factor: increase tMaxIni by multiply this factor at every restart
-        :param lrDecayRate : The decay rate of lrMax
-        """
-        self.lrMin = lrMin
-        self.lrMax = lrMax
-        self.curTT = 0.
-        self.trainingTimes = tMaxIni
-        self.factor = factor
-        self.lrDecayRate = lrDecayRate
-
-    def calculateLearningRate(self):
-        if self.curTT > self.trainingTimes:
-            self.__restart()
-        if self.lrMax > self.lrMin:
-            lrC = float(self.lrMin) + 0.5 * (self.lrMax - self.lrMin) \
-                  * (1. + math.cos(self.curTT / self.trainingTimes * math.pi))
-        else:
-            lrC = self.lrMin
-        return lrC
-
-    def step(self):
-        self.curTT += 1
-
-    def __restart(self):
-        self.lrMax = self.lrMax * self.lrDecayRate
-        self.curTT = 0
-        self.trainingTimes = self.trainingTimes * self.factor
-
-def AddN(tensorList : []):
-    if len(tensorList)==1:
-        return tensorList[0]
-    else:
-        addR = tensorList[0] + tensorList[1]
-        for i in range(2,len(tensorList)):
-            addR = addR + tensorList[i]
-        return addR
-
-def ConcatN(tensorList : []):
-    if len(tensorList) == 1:
-        return tensorList[0]
-    else:
-        return torch.cat(tensorList,dim=1)
-
-# class MishAct(nn.Module):
-#
-#     def __init__(self):
-#         super(MishAct,self).__init__()
-#
-#     def forward(self, x):
-#         return x * torch.tanh(F.softplus(x))
 
 class FilterResponseNormalization(nn.Module):
 

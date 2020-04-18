@@ -20,7 +20,7 @@ if __name__ == "__main__":
     d = 4
     batchSize = 45
     tMaxIni = 1100
-    learning_rate = 7e-4
+    maxLR = 7e-4
     minLR = 2e-6
     labelsNumber = 10
     epoch = 50
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     print(model)
     #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
     lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
-    optimizer = rmsprop.RMSprop(model.parameters(),learning_rate,momentum=0.9,weight_decay=1e-5)
+    optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9,weight_decay=1e-5)
     if loadWeight :
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
     else:
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
 
     ### Train or Test
-    scheduler = CosineDecaySchedule(lrMin=minLR,lrMax=learning_rate,tMaxIni=tMaxIni,factor=1.15,lrDecayRate=decayRate,warmUpSteps=1500)
+    scheduler = CosineDecaySchedule(lrMin=minLR,lrMax=maxLR,tMaxIni=tMaxIni,factor=1.15,lrDecayRate=decayRate,warmUpSteps=1500)
     if ifTrain:
         model.train()
         trainingTimes = 0

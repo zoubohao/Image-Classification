@@ -22,7 +22,6 @@ class CosineDecaySchedule :
         self.lrDecayRate = lrDecayRate
         self.warmUpSteps = warmUpSteps
         self.warmUpC = (lrMax - lrMin) / warmUpSteps
-        print(self.warmUpC)
         self.ifWarmUp = True
 
 
