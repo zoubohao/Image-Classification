@@ -2,7 +2,7 @@ import torch
 import torchvision as tv
 from torch.utils import data as d
 import numpy as np
-import DenseNet
+from CosineSchedule import CosineDecaySchedule
 import torch.nn as nn
 import torch.optim.rmsprop as rmsprop
 from sklearn import metrics
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
 
     ### Train or Test
-    scheduler = DenseNet.CosineDecaySchedule(minLR, learning_rate, tMaxIni, 1.15, lrDecayRate=decayRate)
+    scheduler = CosineDecaySchedule(lrMin=minLR,lrMax=learning_rate,tMaxIni=tMaxIni,factor=1.15,lrDecayRate=decayRate,warmUpSteps=1500)
     if ifTrain:
         model.train()
         trainingTimes = 0
