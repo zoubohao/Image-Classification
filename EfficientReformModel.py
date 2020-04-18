@@ -18,6 +18,54 @@ def AddN(tensorList : []):
             addR = addR + tensorList[i]
         return addR
 
+class Pool2dStaticSamePadding(nn.Module):
+    """
+    created by Zylo117
+    The real keras/tensorflow MaxPool2d with same padding
+    """
+
+    def __init__(self, kernel_size, stride,pooling = "avg"):
+        super().__init__()
+        if pooling.lower() == "max":
+            self.pool = nn.MaxPool2d(kernel_size=kernel_size,stride=stride)
+        elif pooling.lower() == "avg":
+            self.pool = nn.AvgPool2d(kernel_size=kernel_size,stride=stride)
+        else:
+            raise Exception("No implement.")
+        self.stride = self.pool.stride
+        self.kernel_size = self.pool.kernel_size
+
+        if isinstance(self.stride, int):
+            self.stride = [self.stride] * 2
+        elif len(self.stride) == 1:
+            self.stride = [self.stride[0]] * 2
+
+        if isinstance(self.kernel_size, int):
+            self.kernel_size = [self.kernel_size] * 2
+        elif len(self.kernel_size) == 1:
+            self.kernel_size = [self.kernel_size[0]] * 2
+
+    def forward(self, x):
+        h, w = x.shape[-2:]
+
+        h_step = math.ceil(w / self.stride[1])
+        v_step = math.ceil(h / self.stride[0])
+        h_cover_len = self.stride[1] * (h_step - 1) + 1 + (self.kernel_size[1] - 1)
+        v_cover_len = self.stride[0] * (v_step - 1) + 1 + (self.kernel_size[0] - 1)
+
+        extra_h = h_cover_len - w
+        extra_v = v_cover_len - h
+
+        left = extra_h // 2
+        right = extra_h - left
+        top = extra_v // 2
+        bottom = extra_v - top
+
+        x = F.pad(x, [left, right, top, bottom])
+
+        x = self.pool(x)
+        return x
+
 class Conv2dDynamicSamePadding(nn.Module):
     """
     created by Zylo117
@@ -64,36 +112,39 @@ class MBConvBlock(nn.Module):
     def __init__(self, in_channels,out_channels,kernel_size = 3,dropRate = 0.2,expansion_factor = 2):
         super().__init__()
         self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1,bias=False)
-        self.bn_expansion = nn.GroupNorm(num_groups=8,num_channels=in_channels * expansion_factor,eps=0.001)
+        self.bn_expansion = nn.GroupNorm(num_groups=4,num_channels=in_channels * expansion_factor,eps=0.001)
         ###
         self.dwiseConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,
                                                   in_channels * expansion_factor,kernel_size,
                                                   stride=1,groups=in_channels * expansion_factor,bias=False)
         self.point = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels * expansion_factor,kernel_size=1,stride=1)
-        self.bn_Dwise = nn.GroupNorm(8,expansion_factor * in_channels,0.001)
+        self.bn_Dwise = nn.GroupNorm(4,expansion_factor * in_channels,0.001)
+        ###
+        self.splitAttention = SplitAttention(K=4, in_channels=in_channels * expansion_factor,
+                                             inner_channels=in_channels)
         ###
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1,bias=False)
-        self.bn_reduce = nn.GroupNorm(8,in_channels,0.001)
+        self.bn_reduce = nn.GroupNorm(4,in_channels,0.001)
         ###
-        self.splitAttention = SplitAttention(K=4,in_channels=in_channels,inner_channels=in_channels)
         if in_channels == out_channels:
             self.if_down_sample = False
         else:
             self.if_down_sample = True
             self.dropOut = nn.Dropout2d(p=dropRate)
-            self.down_sample_conv = Conv2dDynamicSamePadding(in_channels,out_channels,3,2,bias=False)
+            self.down_sample_conv = nn.Sequential(Conv2dDynamicSamePadding(in_channels,out_channels,1,1),
+                                                  Pool2dStaticSamePadding(3,2))
 
 
     def forward(self, x):
         xOri = x.clone()
         xExpansion = Swish(self.bn_expansion(self.expansionConv(x)))
         xDepthWise = Swish(self.bn_Dwise(self.point(self.dwiseConv(xExpansion))))
-        xReduce = Swish(self.bn_reduce(self.reduceConv(xDepthWise)))
-        xSplitAttention = self.splitAttention(xReduce)
+        xSplitAttention = self.splitAttention(xDepthWise)
+        xReduce = self.bn_reduce(self.reduceConv(xSplitAttention))
         if self.if_down_sample:
-            return self.dropOut(self.down_sample_conv(xSplitAttention + xOri))
+            return self.dropOut(self.down_sample_conv(xReduce + xOri))
         else:
-            return  xSplitAttention + xOri
+            return  xReduce + xOri
 
 class MB_Blocks(nn.Module):
 
@@ -106,7 +157,6 @@ class MB_Blocks(nn.Module):
         for m in self.blocks:
             x = m(x)
         return self.trans(x)
-
 
 
 class EfficientNetReform(nn.Module):
