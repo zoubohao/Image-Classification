@@ -120,7 +120,7 @@ class MBConvBlock(nn.Module):
         self.point = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels * expansion_factor,kernel_size=1,stride=1)
         self.bn_Dwise = nn.GroupNorm(4,expansion_factor * in_channels,0.001)
         ###
-        self.splitAttention = SplitAttention(K=4, in_channels=in_channels * expansion_factor,
+        self.splitAttention = SplitAttention(K=8, in_channels=in_channels,
                                              inner_channels=in_channels)
         ###
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1,bias=False)
@@ -139,12 +139,12 @@ class MBConvBlock(nn.Module):
         xOri = x.clone()
         xExpansion = Swish(self.bn_expansion(self.expansionConv(x)))
         xDepthWise = Swish(self.bn_Dwise(self.point(self.dwiseConv(xExpansion))))
-        xSplitAttention = self.splitAttention(xDepthWise)
-        xReduce = self.bn_reduce(self.reduceConv(xSplitAttention))
+        xReduce = Swish(self.bn_reduce(self.reduceConv(xDepthWise)))
+        xSplitAttention = self.splitAttention(xReduce)
         if self.if_down_sample:
-            return self.dropOut(self.down_sample_conv(xReduce + xOri))
+            return self.dropOut(self.down_sample_conv(xSplitAttention + xOri))
         else:
-            return  xReduce + xOri
+            return  xSplitAttention + xOri
 
 class MB_Blocks(nn.Module):
 

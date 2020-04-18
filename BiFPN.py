@@ -128,21 +128,21 @@ class BiFPN(nn.Module):
 
         self.p4_downsample = nn.Sequential(Conv2dStaticSamePadding(num_channels,num_channels,3,2,groups=num_channels,bias=False),
                                            nn.Conv2d(num_channels,num_channels,1,1,0,bias=True),
-                                           nn.GroupNorm(8,num_channels,eps=1e-3),
+                                           nn.GroupNorm(4,num_channels,eps=1e-3),
                                            Swish())
         self.p5_downsample = nn.Sequential(Conv2dStaticSamePadding(num_channels,num_channels,3,2,groups=num_channels,bias=False),
                                            nn.Conv2d(num_channels,num_channels,1,1,0,bias=True),
-                                           nn.GroupNorm(8,num_channels,eps=1e-3),
+                                           nn.GroupNorm(4,num_channels,eps=1e-3),
                                            Swish())
 
-        self.p4_Up = nn.Sequential(nn.ConvTranspose2d(num_channels,num_channels,3,2,padding=1,output_padding=1,groups=num_channels,bias=False),
-                                   nn.Conv2d(num_channels,num_channels,1,1,0,bias=True),
-                                   nn.GroupNorm(8,num_channels,eps=1e-3),
-                                   Swish())
-        self.p5_Up = nn.Sequential(nn.ConvTranspose2d(num_channels,num_channels,3,2,padding=1,output_padding=1,groups=num_channels,bias=False),
-                                   nn.Conv2d(num_channels,num_channels,1,1,0,bias=True),
-                                   nn.GroupNorm(8,num_channels,eps=1e-3),
-                                   Swish())
+        # self.p4_Up = nn.Sequential(nn.ConvTranspose2d(num_channels,num_channels,3,2,padding=1,output_padding=1,groups=num_channels,bias=False),
+        #                            nn.Conv2d(num_channels,num_channels,1,1,0,bias=True),
+        #                            nn.GroupNorm(8,num_channels,eps=1e-3),
+        #                            Swish())
+        # self.p5_Up = nn.Sequential(nn.ConvTranspose2d(num_channels,num_channels,3,2,padding=1,output_padding=1,groups=num_channels,bias=False),
+        #                            nn.Conv2d(num_channels,num_channels,1,1,0,bias=True),
+        #                            nn.GroupNorm(8,num_channels,eps=1e-3),
+        #                            Swish())
 
         self.swish =  Swish()
 
@@ -150,24 +150,24 @@ class BiFPN(nn.Module):
         if self.first_time:
             self.p5_down_channel = nn.Sequential(
                 Conv2dStaticSamePadding(conv_channels[2], num_channels, 1),
-                nn.GroupNorm(8,num_channels,eps=1e-3),
+                nn.GroupNorm(4,num_channels,eps=1e-3),
             )
             self.p4_down_channel = nn.Sequential(
                 Conv2dStaticSamePadding(conv_channels[1], num_channels, 1),
-                nn.GroupNorm(8,num_channels,eps=1e-3),
+                nn.GroupNorm(4,num_channels,eps=1e-3),
             )
             self.p3_down_channel = nn.Sequential(
                 Conv2dStaticSamePadding(conv_channels[0], num_channels, 1),
-                nn.GroupNorm(8,num_channels,eps=1e-3),
+                nn.GroupNorm(4,num_channels,eps=1e-3),
             )
 
             self.p4_down_channel_2 = nn.Sequential(
                 Conv2dStaticSamePadding(conv_channels[1], num_channels, 1),
-                nn.GroupNorm(8,num_channels,eps=1e-3),
+                nn.GroupNorm(4,num_channels,eps=1e-3),
             )
             self.p5_down_channel_2 = nn.Sequential(
                 Conv2dStaticSamePadding(conv_channels[2], num_channels, 1),
-                nn.GroupNorm(8,num_channels,eps=1e-3),
+                nn.GroupNorm(4,num_channels,eps=1e-3),
             )
 
         # Weight
@@ -211,13 +211,13 @@ class BiFPN(nn.Module):
         p4_w1 = self.p4_w1_relu(self.p4_w1)
         weight = p4_w1 / (torch.sum(p4_w1, dim=0) + self.epsilon)
         # Connections for P4_0 and P5_0 to P4_1 respectively
-        p4_up = self.conv4_up(self.swish(weight[0] * p4_in + weight[1] * self.matching(self.p5_Up(p5_in), p4_in.shape[-2:])))
+        p4_up = self.conv4_up(self.swish(weight[0] * p4_in + weight[1] * self.matching(p5_in, p4_in.shape[-2:])))
 
         # Weights for P3_0 and P4_1 to P3_2
         p3_w1 = self.p3_w1_relu(self.p3_w1)
         weight = p3_w1 / (torch.sum(p3_w1, dim=0) + self.epsilon)
         # Connections for P3_0 and P4_1 to P3_2 respectively
-        p3_out = self.conv3_up(self.swish(weight[0] * p3_in + weight[1] * self.matching(self.p4_Up(p4_up), p3_in.shape[-2:])))
+        p3_out = self.conv3_up(self.swish(weight[0] * p3_in + weight[1] * self.matching(p4_up, p3_in.shape[-2:])))
 
         if self.first_time:
             p4_in = self.p4_down_channel_2(p4)

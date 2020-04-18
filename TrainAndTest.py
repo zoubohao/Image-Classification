@@ -17,9 +17,9 @@ class DataLoaderX(d.DataLoader):
 if __name__ == "__main__":
     ### config
     w = 2
-    d = 3
-    batchSize = 20
-    tMaxIni = 1200
+    d = 4
+    batchSize = 45
+    tMaxIni = 1100
     growthRate = 32
     blocks = [6,12,24,16]
     learning_rate = 8e-4
