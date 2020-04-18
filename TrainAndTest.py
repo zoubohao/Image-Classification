@@ -20,25 +20,21 @@ if __name__ == "__main__":
     d = 4
     batchSize = 45
     tMaxIni = 1100
-    growthRate = 32
-    blocks = [6,12,24,16]
-    learning_rate = 8e-4
+    learning_rate = 7e-4
     minLR = 2e-6
     labelsNumber = 10
-    ifUseBn = True
-    ifTrain = True
     epoch = 50
     displayTimes = 25
     modelSavePath = "./Model_Weight/"
+    ifTrain = True
     loadWeight = False
-    trainModelLoad = 0
+    trainModelLoad = 2
     testModelLoad = 0
-    decayRate = 0.92
+    decayRate = 0.9
     stepTimes = 1
     saveTimes = 2500
     # clip_value = 20
     ### Data pre-processing
-    import math
     transformationTrain = tv.transforms.Compose([
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
         # tv.transforms.RandomHorizontalFlip(p = 0.25),
