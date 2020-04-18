@@ -2,7 +2,7 @@ import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
-from EfficientNet import EfficientNetReform
+from EfficientReformModel import EfficientNetReform
 from BiFPN import BiFPN
 
 writer = SummaryWriter()

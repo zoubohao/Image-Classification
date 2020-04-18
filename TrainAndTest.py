@@ -2,11 +2,11 @@ import torch
 import torchvision as tv
 from torch.utils import data as d
 import numpy as np
-import Model
+import DenseNet
 import torch.nn as nn
 import torch.optim.rmsprop as rmsprop
 from sklearn import metrics
-import EfficientNet
+import EfficientReformModel
 from prefetch_generator import BackgroundGenerator
 
 class DataLoaderX(d.DataLoader):
@@ -16,13 +16,13 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    w = 4
-    d = 4
-    batchSize = 18
+    w = 3
+    d = 3
+    batchSize = 16
     tMaxIni = 1200
     growthRate = 32
     blocks = [6,12,24,16]
-    learning_rate = 7e-4
+    learning_rate = 8e-4
     minLR = 2e-6
     labelsNumber = 10
     ifUseBn = True
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     displayTimes = 25
     modelSavePath = "./Model_Weight/"
     loadWeight = False
-    trainModelLoad = 7
+    trainModelLoad = 0
     testModelLoad = 0
     decayRate = 0.92
     stepTimes = 1
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
 
     ### model construct
-    model = EfficientNet.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
+    model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
     print(model)
     #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
     lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
 
     ### Train or Test
-    scheduler = Model.CosineDecaySchedule(minLR,learning_rate,tMaxIni,1.15,lrDecayRate=decayRate)
+    scheduler = DenseNet.CosineDecaySchedule(minLR, learning_rate, tMaxIni, 1.15, lrDecayRate=decayRate)
     if ifTrain:
         model.train()
         trainingTimes = 0
