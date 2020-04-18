@@ -22,7 +22,8 @@ class MBConvBlock(nn.Module):
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1,bias=False)
         self.bn_reduce = nn.GroupNorm(4,in_channels,0.001)
         ###
-        self.actLayer = Swish()
+        self.actLayer1 = Swish()
+        self.actLayer2 = Swish()
         if in_channels == out_channels:
             self.if_down_sample = False
         else:
@@ -34,8 +35,8 @@ class MBConvBlock(nn.Module):
 
     def forward(self, x):
         xOri = x.clone()
-        xExpansion = self.actLayer(self.bn_expansion(self.expansionConv(x)))
-        xResNeSt = self.actLayer(self.bn_Dwise(self.resNeSt(xExpansion)))
+        xExpansion = self.actLayer1(self.bn_expansion(self.expansionConv(x)))
+        xResNeSt = self.actLayer2(self.bn_Dwise(self.resNeSt(xExpansion)))
         xReduce = self.bn_reduce(self.reduceConv(xResNeSt))
         if self.if_down_sample:
             return self.dropOut(self.down_sample_conv(xReduce + xOri))

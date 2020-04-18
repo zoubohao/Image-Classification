@@ -53,7 +53,7 @@ class CosineDecaySchedule :
         self.ifWarmUp = False
 
 if __name__ == "__main__":
-    testSche = CosineDecaySchedule(1e-5,1e-3,1100,1.15,0.85,1500)
+    testSche = CosineDecaySchedule(2e-6,7e-4,1100,1.15,0.85,1500)
     testTotalTrainingTimes = 30000
     x = []
     for i in range(testTotalTrainingTimes):
