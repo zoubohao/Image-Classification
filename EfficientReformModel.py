@@ -16,7 +16,7 @@ class MBConvBlock(nn.Module):
         self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1,bias=False)
         self.bn_expansion = nn.GroupNorm(num_groups=8,num_channels=in_channels * expansion_factor,eps=0.001)
         ### resNeSt block
-        self.resNeSt = ResNeSt(k = 2,r = 4,in_channels=expansion_factor * in_channels)
+        self.resNeSt = ResNeSt(k = 4,r = 4,in_channels=expansion_factor * in_channels)
         self.bn_Dwise = nn.GroupNorm(8,expansion_factor * in_channels,0.001)
         ### reduce block
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1,bias=False)

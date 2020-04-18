@@ -35,8 +35,12 @@ class Cardinal(nn.Module):
     def __init__(self,R,in_channels):
         super().__init__()
         self.r = R
-        self.conv1 = Conv2dDynamicSamePadding(in_channels,in_channels,kernel_size=1,stride=1,groups=R)
-        self.conv3 = Conv2dDynamicSamePadding(in_channels,in_channels * R,kernel_size=3,stride=1,groups=R)
+        self.conv1 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,in_channels,kernel_size=1,stride=1,groups=R),
+                                   nn.GroupNorm(R,in_channels),
+                                   Swish())
+        self.conv3 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,in_channels * R,kernel_size=3,stride=1,groups=R),
+                                   nn.GroupNorm(R,in_channels * R),
+                                   Swish())
         self.splitAttention = SplitAttention(R,in_channels,inner_channels=in_channels * 2)
 
     def forward(self, x):
@@ -54,7 +58,6 @@ class ResNeSt(nn.Module):
         xOri = x.clone()
         chunks = torch.chunk(x,self.k,dim=-3)
         catList = []
-        #print(chunks[0].shape)
         for i , one in enumerate(chunks):
             catList.append(self.Cardinals[i](one))
         return self.conv1(torch.cat(catList,dim=-3)) + xOri
@@ -62,7 +65,7 @@ class ResNeSt(nn.Module):
 
 if __name__ == "__main__":
     testInput = torch.randn(size=[5,16,31,31]).float()
-    testModule = ResNeSt(k = 2,r= 4,in_channels=16)
+    testModule = ResNeSt(k = 4,r= 2,in_channels=16)
     testRes = testModule(testInput)
     testRes.mean().backward()
     from Tools import plot_grad_flow
