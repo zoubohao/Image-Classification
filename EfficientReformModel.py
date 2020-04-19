@@ -78,13 +78,13 @@ class EfficientNetReform(nn.Module):
         self.block7 = MB_Blocks(160 * w, 320 * w, layers=3 * d,  drop_connect_rate=drop_connect_rate)
         self.block8 = MB_Blocks(320 * w, 320 * w, layers=2 * d, drop_connect_rate=drop_connect_rate)
         ### BiFPN 8, 4, 2
-        self.BifpnFirst = BiFPN(num_channels=128 * w // 2, conv_channels=[80 * w,160 * w,320 * w],first_time=True)
-        self.Bifpn = BiFPN(128 * w // 2,conv_channels=[],first_time=False)
+        self.BifpnFirst = BiFPN(num_channels=128 * w , conv_channels=[80 * w,160 * w,320 * w],first_time=True)
+        self.Bifpn = BiFPN(128 * w ,conv_channels=[],first_time=False)
         self.actLayer = Swish()
         ### classify
         self.classify = classify
         if classify :
-            self.seq = nn.Sequential(nn.Linear(128 * w // 2,1280),
+            self.seq = nn.Sequential(nn.Linear(128 * w,1280),
                                      nn.BatchNorm1d(1280),
                                      Swish(),
                                      nn.Dropout(drop_connect_rate),

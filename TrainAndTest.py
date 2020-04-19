@@ -18,22 +18,29 @@ if __name__ == "__main__":
     ### config
     w = 2
     d = 4
-    batchSize = 45
-    tMaxIni = 1100
-    maxLR = 7e-4
-    minLR = 2e-6
+    batchSize = 56
     labelsNumber = 10
     epoch = 50
-    displayTimes = 25
+    displayTimes = 5
+    ###
     modelSavePath = "./Model_Weight/"
-    ifTrain = True
-    loadWeight = False
-    trainModelLoad = 2
-    testModelLoad = 0
-    decayRate = 0.9
-    stepTimes = 1
     saveTimes = 2500
-    # clip_value = 20
+    ###
+    loadWeight = False
+    trainModelLoad = 4
+    ###
+    tMaxIni = 1100
+    maxLR = 5e-4
+    minLR = 1e-6
+    decayRate = 0.92
+    warmUpSteps = 1500
+    ###
+    stepTimes = 1
+    ###
+    ifTrain = True
+    testModelLoad = 0
+
+
     ### Data pre-processing
     transformationTrain = tv.transforms.Compose([
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
@@ -56,7 +63,6 @@ if __name__ == "__main__":
     dataLoader = DataLoaderX(cifarDataTrainSet,batch_size=batchSize,shuffle=True,num_workers=4,pin_memory=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
     ### model construct
     model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
     print(model)
@@ -72,23 +78,19 @@ if __name__ == "__main__":
             if isinstance(m, nn.Linear):
                 torch.nn.init.xavier_normal_(m.weight)
 
-
     ### Train or Test
-    scheduler = CosineDecaySchedule(lrMin=minLR,lrMax=maxLR,tMaxIni=tMaxIni,factor=1.15,lrDecayRate=decayRate,warmUpSteps=1500)
+    scheduler = CosineDecaySchedule(lrMin=minLR,lrMax=maxLR,tMaxIni=tMaxIni,factor=1.15,lrDecayRate=decayRate,warmUpSteps=warmUpSteps)
     if ifTrain:
         model.train()
         trainingTimes = 0
         for e in range(epoch):
             for times , (images, labels) in enumerate(dataLoader):
-                #optimizer.zero_grad()
                 imagesCuda = images.float().to(device,non_blocking = True)
                 labelsCuda = labels.long().to(device,non_blocking = True)
-                #scheduler.step(e + times // iters)
                 predict = model(imagesCuda)
                 oriLoss = lossCri(predict,labelsCuda)
                 loss = oriLoss / stepTimes
                 loss.backward()
-                #optimizer.step()
                 if trainingTimes % displayTimes == 0:
                     print("#########")
                     print("Predict is : ",predict[0:3])

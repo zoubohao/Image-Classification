@@ -12,7 +12,7 @@ class CosineDecaySchedule :
         :param tMaxIni: The initial max training times in one schedule
         :param factor: increase tMaxIni by multiply this factor at every restart
         :param lrDecayRate : The decay rate of lrMax
-        :param warmUpSteps :
+        :param warmUpSteps : The warm up times.
         """
         self.lrMin = lrMin
         self.lrMax = lrMax
