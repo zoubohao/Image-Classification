@@ -14,13 +14,13 @@ class MBConvBlock(nn.Module):
         super().__init__()
         ### expansion block
         self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1,bias=False)
-        self.bn_expansion = nn.GroupNorm(num_groups=8,num_channels=in_channels * expansion_factor,eps=0.001)
+        self.bn_expansion = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
         ### resNeSt block
         self.resNeSt = ResNeSt(k = 4,r = 2,in_channels=expansion_factor * in_channels)
-        self.bn_Dwise = nn.GroupNorm(8,expansion_factor * in_channels,0.001)
+        self.bn_Dwise = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
         ### reduce block
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1,bias=False)
-        self.bn_reduce = nn.GroupNorm(4,in_channels,0.001)
+        self.bn_reduce = nn.BatchNorm2d(in_channels,eps=0.001,momentum=0.01)
         ###
         self.actLayer1 = Swish()
         self.actLayer2 = Swish()
@@ -63,7 +63,7 @@ class EfficientNetReform(nn.Module):
         super(EfficientNetReform,self).__init__()
         ### stem 2X 32
         self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=7, stride=2)
-        self.bn0 = nn.GroupNorm(8,num_channels=32 * w,  eps=0.001)
+        self.bn0 = nn.BatchNorm2d(32 * w,  eps=0.001,momentum=0.01)
         ### blocks
         ### r1 2X 16
         self.block1 = MB_Blocks(32 * w, 32 * w, layers=1 * d,  drop_connect_rate=drop_connect_rate)

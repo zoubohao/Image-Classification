@@ -9,6 +9,7 @@ from sklearn import metrics
 import EfficientReformModel
 from prefetch_generator import BackgroundGenerator
 
+
 class DataLoaderX(d.DataLoader):
 
     def __iter__(self):
@@ -16,29 +17,31 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    w = 2
-    d = 4
-    batchSize = 56
+    w = 3
+    d = 3
+    batchSize = 32
     labelsNumber = 10
     epoch = 50
-    displayTimes = 5
+    displayTimes = 10
     ###
     modelSavePath = "./Model_Weight/"
-    saveTimes = 2500
+    saveTimes = 1200
     ###
     loadWeight = False
     trainModelLoad = 4
     ###
+    valTestSampleNumber = 500
+    ###
     tMaxIni = 1100
-    maxLR = 5e-4
+    maxLR = 8.5e-4
     minLR = 1e-6
-    decayRate = 0.92
-    warmUpSteps = 1500
+    decayRate = 0.9
+    warmUpSteps = 1200
     ###
     stepTimes = 1
     ###
     ifTrain = True
-    testModelLoad = 0
+    testModelLoad = 3
 
 
     ### Data pre-processing
@@ -110,7 +113,26 @@ if __name__ == "__main__":
                     scheduler.step()
                     optimizer.zero_grad()
                 if trainingTimes % saveTimes == 0 :
-                    torch.save(model.state_dict(), modelSavePath + "Model_" + str(e) + ".pth")
+                    ### val part
+                    model.eval()
+                    predictList = []
+                    truthList = []
+                    k = 0
+                    for testImage, testTarget in cifarDataTestSet:
+                        predictTensor = model(testImage.unsqueeze(0).to(device)).cpu().detach().numpy()
+                        position = np.argmax(np.squeeze(predictTensor))
+                        if k % displayTimes == 0:
+                            print("Validation : " + str(k))
+                            print(position)
+                            print(testTarget)
+                        predictList.append(position)
+                        truthList.append(testTarget)
+                        k += 1
+                        if k == valTestSampleNumber:
+                            break
+                    acc = metrics.accuracy_score(y_true=truthList, y_pred=predictList)
+                    torch.save(model.state_dict(), modelSavePath + "Model_" + str(acc) + ".pth")
+                    model.train()
     else:
         model.eval()
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(testModelLoad) + ".pth"))

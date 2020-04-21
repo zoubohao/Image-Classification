@@ -12,7 +12,7 @@ class SplitAttention(nn.Module):
         super().__init__()
         self.r = r
         self.fc1 = nn.Conv2d(in_channels, inner_channels,1)
-        self.gn1 = nn.GroupNorm(r,inner_channels,eps=1e-3)
+        self.gn1 = nn.BatchNorm2d(inner_channels,eps=1e-3,momentum=0.01)
         self.fc2 = nn.Conv2d(inner_channels, in_channels * r, 1, groups=r)
         self.in_channels = in_channels
         self.act = Swish()
@@ -36,10 +36,10 @@ class Cardinal(nn.Module):
         super().__init__()
         self.r = R
         self.conv1 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,in_channels,kernel_size=1,stride=1,groups=R),
-                                   nn.GroupNorm(R,in_channels),
+                                   nn.BatchNorm2d(in_channels,0.001,0.01),
                                    Swish())
         self.conv3 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,in_channels * R,kernel_size=3,stride=1,groups=R),
-                                   nn.GroupNorm(R,in_channels * R),
+                                   nn.BatchNorm2d(in_channels * R,0.001,0.1),
                                    Swish())
         self.splitAttention = SplitAttention(R,in_channels,inner_channels=in_channels * 2)
 
