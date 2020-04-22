@@ -4,40 +4,42 @@ import torch.nn.functional as F
 from Tools import Conv2dDynamicSamePadding
 from collections import OrderedDict
 from BiFPN import BiFPN
-from Tools import Pool2dStaticSamePadding
 from Tools import Swish
 from SplitAttention import ResNeSt
+from Tools import Pool2dStaticSamePadding
 
 class MBConvBlock(nn.Module):
 
     def __init__(self, in_channels,out_channels,dropRate = 0.2,expansion_factor = 2):
         super().__init__()
         ### expansion block
-        self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1,bias=False)
+        self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1)
         self.bn_expansion = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
+        self.actLayer1 = Swish()
         ### resNeSt block
-        self.resNeSt = ResNeSt(k = 4,r = 2,in_channels=expansion_factor * in_channels)
+        self.resNeSt = ResNeSt(k = 2,r = 4,in_channels=expansion_factor * in_channels)
         self.bn_Dwise = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
         ### reduce block
-        self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1,bias=False)
+        self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1)
         self.bn_reduce = nn.BatchNorm2d(in_channels,eps=0.001,momentum=0.01)
-        ###
-        self.actLayer1 = Swish()
         self.actLayer2 = Swish()
+        ###
+
         if in_channels == out_channels:
             self.if_down_sample = False
         else:
             self.if_down_sample = True
             self.dropOut = nn.Dropout2d(p=dropRate)
-            self.down_sample_conv = nn.Sequential(Conv2dDynamicSamePadding(in_channels,out_channels,1,1),
+            self.down_sample_conv = nn.Sequential(Conv2dDynamicSamePadding(in_channels,out_channels,kernel_size=3,stride=1),
+                                                  nn.BatchNorm2d(out_channels,eps=1e-3,momentum=0.01),
                                                   Pool2dStaticSamePadding(3,2))
 
 
     def forward(self, x):
         xOri = x.clone()
         xExpansion = self.actLayer1(self.bn_expansion(self.expansionConv(x)))
-        xResNeSt = self.actLayer2(self.bn_Dwise(self.resNeSt(xExpansion)))
-        xReduce = self.bn_reduce(self.reduceConv(xResNeSt))
+        xResNeSt = self.bn_Dwise(self.resNeSt(xExpansion))
+        xReduce = self.actLayer2(self.bn_reduce(self.reduceConv(xResNeSt)))
         if self.if_down_sample:
             return self.dropOut(self.down_sample_conv(xReduce + xOri))
         else:
@@ -61,30 +63,31 @@ class EfficientNetReform(nn.Module):
 
     def __init__(self,in_channels,w = 3,d = 3,drop_connect_rate = 0.2,num_classes = 10,classify = True):
         super(EfficientNetReform,self).__init__()
-        ### stem 2X 32
-        self.conv_stem = Conv2dDynamicSamePadding(in_channels, 32 * w, kernel_size=7, stride=2)
-        self.bn0 = nn.BatchNorm2d(32 * w,  eps=0.001,momentum=0.01)
+        ### r0 32
+        self.conv_stem = Conv2dDynamicSamePadding(in_channels, 16 * w, kernel_size=7, stride=1)
+        self.bn0 = nn.BatchNorm2d(16 * w,  eps=0.001,momentum=0.01)
         ### blocks
-        ### r1 2X 16
-        self.block1 = MB_Blocks(32 * w, 32 * w, layers=1 * d,  drop_connect_rate=drop_connect_rate)
-        self.block2 = MB_Blocks(32 * w, 40 * w, layers=2 * d,  drop_connect_rate=drop_connect_rate)
-        ### r2 2X 8
-        self.block3 = MB_Blocks(40 * w, 40 * w, layers=2 * d,  drop_connect_rate=drop_connect_rate)
-        self.block4 = MB_Blocks(40 * w, 80 * w, layers=3 * d,  drop_connect_rate=drop_connect_rate)
-        ### r3 2X 4
-        self.block5 = MB_Blocks(80 * w, 80 * w, layers=3 * d, drop_connect_rate=drop_connect_rate)
-        self.block6 = MB_Blocks(80 * w, 160 * w, layers=4 * d, drop_connect_rate=drop_connect_rate)
-        ### r4 2X 2
-        self.block7 = MB_Blocks(160 * w, 320 * w, layers=3 * d,  drop_connect_rate=drop_connect_rate)
-        self.block8 = MB_Blocks(320 * w, 320 * w, layers=2 * d, drop_connect_rate=drop_connect_rate)
+        ### r1 16
+        self.block1 = MB_Blocks(16 * w, 16 * w, layers=1 * d,  drop_connect_rate=drop_connect_rate)
+        self.block2 = MB_Blocks(16 * w, 32 * w, layers=2 * d,  drop_connect_rate=drop_connect_rate)
+        ### r2 8
+        self.block3 = MB_Blocks(32 * w, 32 * w, layers=2 * d,  drop_connect_rate=drop_connect_rate)
+        self.block4 = MB_Blocks(32 * w, 64 * w, layers=3 * d,  drop_connect_rate=drop_connect_rate)
+        ### r3 4
+        self.block5 = MB_Blocks(64 * w, 64 * w, layers=3 * d, drop_connect_rate=drop_connect_rate)
+        self.block6 = MB_Blocks(64 * w, 128 * w, layers=4 * d, drop_connect_rate=drop_connect_rate)
+        ### r4 2
+        self.block7 = MB_Blocks(128 * w, 256 * w, layers=3 * d,  drop_connect_rate=drop_connect_rate)
+        self.block8 = MB_Blocks(256 * w, 256 * w, layers=2 * d, drop_connect_rate=drop_connect_rate)
         ### BiFPN 8, 4, 2
-        self.BifpnFirst = BiFPN(num_channels=128 * w , conv_channels=[80 * w,160 * w,320 * w],first_time=True)
-        self.Bifpn = BiFPN(128 * w ,conv_channels=[],first_time=False)
+        self.BifpnFirst = BiFPN(num_channels=256 + 64 * w , conv_channels=[64 * w,128 * w,256 * w],first_time=True)
+        self.Bifpn = BiFPN(256 + 64 * w ,conv_channels=[],first_time=False)
         self.actLayer = Swish()
         ### classify
         self.classify = classify
         if classify :
-            self.seq = nn.Sequential(nn.Linear(128 * w,1280),
+            self.p = nn.Parameter(torch.ones(3, dtype=torch.float32), requires_grad=True)
+            self.seq = nn.Sequential(nn.Linear(256 + 64 * w,1280),
                                      nn.BatchNorm1d(1280),
                                      Swish(),
                                      nn.Dropout(drop_connect_rate),
@@ -104,10 +107,17 @@ class EfficientNetReform(nn.Module):
         p4 = self.block8(self.block7(p3))
         rP3, rP4, rP5 = self.BifpnFirst(p2,p3,p4)
         rP3, rP4, rP5 = self.Bifpn(rP3, rP4, rP5)
+        # print(xStem.shape)
+        # print(p1.shape)
+        # print(p2.shape)
+        # print(p3.shape)
+        # print(p4.shape)
         if self.classify:
-            feat1 = F.adaptive_avg_pool2d(rP3,output_size=[1,1])
-            feat2 = F.adaptive_avg_pool2d(rP4,output_size=[1,1])
-            feat3 = F.adaptive_avg_pool2d(rP5,output_size=[1,1])
+            weight = F.relu(self.p)
+            weight = weight / (torch.sum(weight, dim=0) + 1e-4)
+            feat1 = F.adaptive_avg_pool2d(rP3,output_size=[1,1]) * weight[0]
+            feat2 = F.adaptive_avg_pool2d(rP4,output_size=[1,1]) * weight[1]
+            feat3 = F.adaptive_avg_pool2d(rP5,output_size=[1,1]) * weight[2]
             featFinal = feat1 + feat2 + feat3
             return self.seq(torch.squeeze(torch.squeeze(featFinal, -1), -1))
         else:

@@ -17,7 +17,7 @@ class DataLoaderX(d.DataLoader):
 
 if __name__ == "__main__":
     ### config
-    w = 3
+    w = 2
     d = 3
     batchSize = 32
     labelsNumber = 10
@@ -28,12 +28,12 @@ if __name__ == "__main__":
     saveTimes = 1200
     ###
     loadWeight = False
-    trainModelLoad = 4
+    trainModelLoad = 0.096
     ###
     valTestSampleNumber = 500
     ###
     tMaxIni = 1100
-    maxLR = 8.5e-4
+    maxLR = 1e-3
     minLR = 1e-6
     decayRate = 0.9
     warmUpSteps = 1200
@@ -47,9 +47,9 @@ if __name__ == "__main__":
     ### Data pre-processing
     transformationTrain = tv.transforms.Compose([
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
-        # tv.transforms.RandomHorizontalFlip(p = 0.25),
-        # tv.transforms.RandomVerticalFlip(p = 0.334),
-        #tv.transforms.RandomApply([tv.transforms.RandomResizedCrop(32)],p=0.5),
+        tv.transforms.RandomHorizontalFlip(p = 0.25),
+        tv.transforms.RandomVerticalFlip(p = 0.334),
+        tv.transforms.RandomApply([tv.transforms.RandomResizedCrop(32)],p=0.5),
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
     print(model)
     #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
-    lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
+    lossCri = nn.CrossEntropyLoss(reduction="mean").to(device)
     optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9,weight_decay=1e-5)
     if loadWeight :
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
@@ -99,7 +99,7 @@ if __name__ == "__main__":
                     print("Predict is : ",predict[0:3])
                     print("Labels are : ",labelsCuda[0:3])
                     print("Learning rate is ", optimizer.state_dict()['param_groups'][0]["lr"])
-                    print("Loss is ", oriLoss / batchSize + 0.)
+                    print("Loss is ", oriLoss)
                     print("Epoch : ", e)
                     print("Training time is ", trainingTimes)
                 trainingTimes += 1
