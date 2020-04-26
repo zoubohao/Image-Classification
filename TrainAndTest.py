@@ -19,26 +19,27 @@ if __name__ == "__main__":
     ### config
     w = 2
     d = 3
-    batchSize = 32
+    batchSize = 16
     labelsNumber = 10
     epoch = 50
-    displayTimes = 10
+    displayTimes = 8
     ###
     modelSavePath = "./Model_Weight/"
-    saveTimes = 1200
+    saveTimes = 3200 # For training 400 step
     ###
-    loadWeight = False
-    trainModelLoad = 0.096
+    loadWeight= True
+    trainModelLoad = 0.81
     ###
     valTestSampleNumber = 500
-    ###
-    tMaxIni = 1100
-    maxLR = 1e-3
+    ### trainingTimes = stepTimes * currentStep
+    tMaxIni = 180
+    maxLR = 1.25e-4
     minLR = 1e-6
-    decayRate = 0.9
-    warmUpSteps = 1200
+    decayRate = 0.91
+    ## warmUpSteps * stepTimes
+    warmUpSteps = 180
     ###
-    stepTimes = 1
+    stepTimes = 8
     ###
     ifTrain = True
     testModelLoad = 3
@@ -49,7 +50,7 @@ if __name__ == "__main__":
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
         tv.transforms.RandomHorizontalFlip(p = 0.25),
         tv.transforms.RandomVerticalFlip(p = 0.334),
-        tv.transforms.RandomApply([tv.transforms.RandomResizedCrop(32)],p=0.5),
+        tv.transforms.RandomApply([tv.transforms.CenterCrop(size=32),tv.transforms.ColorJitter()],p=0.5),
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
@@ -58,6 +59,7 @@ if __name__ == "__main__":
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
+
     #cifarDataTrainSet = tv.datasets.CIFAR100(root="./Cifar100/",train=True,download=True,transform=transformation)
     #cifarDataTestSet = tv.datasets.CIFAR100(root="./Cifar100/",train=False,download=True)
 
@@ -69,9 +71,9 @@ if __name__ == "__main__":
     ### model construct
     model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
     print(model)
-    #lossCri = Model.LabelsSmoothingCrossLoss(labelsNumber,0.09).to(device)
     lossCri = nn.CrossEntropyLoss(reduction="mean").to(device)
-    optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9,weight_decay=1e-5)
+    #optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9,weight_decay=1e-5)
+    optimizer = torch.optim.SGD(model.parameters(),minLR,momentum=0.9,nesterov=True,weight_decay=1e-5)
     if loadWeight :
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
     else:
@@ -94,6 +96,7 @@ if __name__ == "__main__":
                 oriLoss = lossCri(predict,labelsCuda)
                 loss = oriLoss / stepTimes
                 loss.backward()
+                trainingTimes += 1
                 if trainingTimes % displayTimes == 0:
                     print("#########")
                     print("Predict is : ",predict[0:3])
@@ -102,7 +105,6 @@ if __name__ == "__main__":
                     print("Loss is ", oriLoss)
                     print("Epoch : ", e)
                     print("Training time is ", trainingTimes)
-                trainingTimes += 1
                 if trainingTimes % stepTimes == 0:
                     #nn.utils.clip_grad_value_(model.parameters(), clip_value)
                     learning_rate = scheduler.calculateLearningRate()

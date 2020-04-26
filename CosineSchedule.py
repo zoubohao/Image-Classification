@@ -1,8 +1,5 @@
 import math
 
-
-
-
 class CosineDecaySchedule :
 
     def __init__(self,lrMin,lrMax,tMaxIni,factor,lrDecayRate,warmUpSteps):

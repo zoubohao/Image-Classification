@@ -89,7 +89,6 @@ class EfficientNetReform(nn.Module):
             self.p = nn.Parameter(torch.ones(3, dtype=torch.float32), requires_grad=True)
             self.seq = nn.Sequential(nn.Linear(256 + 64 * w,1280),
                                      nn.BatchNorm1d(1280),
-                                     Swish(),
                                      nn.Dropout(drop_connect_rate),
                                      nn.Linear(1280,num_classes))
 

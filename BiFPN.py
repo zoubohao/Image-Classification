@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from Tools import SeparableConvBlock
 from Tools import Conv2dStaticSamePadding
-from Tools import Swish
 import torch.nn.functional as F
 
 

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class FilterResponseNormalization(nn.Module):
 
     def __init__(self,C):
@@ -112,9 +113,9 @@ class UpBlocks(nn.Module):
     def forward(self, x):
         x1s = [x]
         for currentM in self.layerList:
-            tempResult = currentM(ConcatN(x1s))
+            tempResult = currentM(torch.cat(x1s,dim=-3))
             x1s.append(tempResult)
-        x1O = ConcatN(x1s)
+        x1O = torch.cat(x1s,dim=-3)
         normT = self.norm(self.upCha(x1O))
         return self.seBlock(normT)
 
@@ -146,27 +147,6 @@ class MyModel (nn.Module):
         liner1 = self.liner1(gT)
         return liner1 , gT
 
-class LabelsSmoothingCrossLoss(nn.Module):
-
-    def __init__(self,labelsNumber:int,e = 0.1):
-        super(LabelsSmoothingCrossLoss,self).__init__()
-        self._labelsNumber = labelsNumber
-        self._trueClass = (1 - e) * 1.
-        self._falseClass = e / (self._labelsNumber - 1.) + 0.
-
-    def forward(self, predict ,target):
-        """
-        :param predict: torch tensor [N,L]
-        :param target: [L]
-        :return:
-        """
-        softMaxX = torch.log_softmax(predict,dim=-1)
-        with torch.no_grad():
-            labelsTensor = torch.zeros_like(predict)
-            labelsTensor.fill_(self._falseClass)
-            labelsTensor.scatter_(1, target.data.unsqueeze(1), self._trueClass)
-            #print(labelsTensor)
-        return torch.mul(softMaxX,-labelsTensor).sum(dtype=torch.float32)
 
 
 if __name__ == "__main__":
