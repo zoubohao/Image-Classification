@@ -13,33 +13,32 @@ class MBConvBlock(nn.Module):
     def __init__(self, in_channels,out_channels,dropRate = 0.2,expansion_factor = 2):
         super().__init__()
         ### expansion block
-        self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1,groups=1)
+        self.expansionConv = Conv2dDynamicSamePadding(in_channels,expansion_factor * in_channels,1,1)
         self.bn_expansion = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
-        self.actLayer1 = Swish()
         ### resNeSt block
         self.resNeSt = ResNeSt(k = 2,r = 4,in_channels=expansion_factor * in_channels)
         self.bn_Dwise = nn.BatchNorm2d(in_channels * expansion_factor,eps=0.001,momentum=0.01)
         ### reduce block
         self.reduceConv = Conv2dDynamicSamePadding(in_channels * expansion_factor,in_channels,1,1)
         self.bn_reduce = nn.BatchNorm2d(in_channels,eps=0.001,momentum=0.01)
-        self.actLayer2 = Swish()
         ###
 
         if in_channels == out_channels:
             self.if_down_sample = False
         else:
             self.if_down_sample = True
-            self.dropOut = nn.Dropout2d(p=dropRate)
+            self.dropOut = nn.Dropout(p=dropRate)
             self.down_sample_conv = nn.Sequential(Conv2dDynamicSamePadding(in_channels,out_channels,kernel_size=3,stride=1),
                                                   nn.BatchNorm2d(out_channels,eps=1e-3,momentum=0.01),
+                                                  Swish(),
                                                   Pool2dStaticSamePadding(3,2))
 
 
     def forward(self, x):
         xOri = x.clone()
-        xExpansion = self.actLayer1(self.bn_expansion(self.expansionConv(x)))
+        xExpansion = self.bn_expansion(self.expansionConv(x))
         xResNeSt = self.bn_Dwise(self.resNeSt(xExpansion))
-        xReduce = self.actLayer2(self.bn_reduce(self.reduceConv(xResNeSt)))
+        xReduce = self.bn_reduce(self.reduceConv(xResNeSt))
         if self.if_down_sample:
             return self.dropOut(self.down_sample_conv(xReduce + xOri))
         else:
@@ -66,6 +65,7 @@ class EfficientNetReform(nn.Module):
         ### r0 32
         self.conv_stem = Conv2dDynamicSamePadding(in_channels, 16 * w, kernel_size=7, stride=1)
         self.bn0 = nn.BatchNorm2d(16 * w,  eps=0.001,momentum=0.01)
+        self.actLayer = Swish()
         ### blocks
         ### r1 16
         self.block1 = MB_Blocks(16 * w, 16 * w, layers=1 * d,  drop_connect_rate=drop_connect_rate)
@@ -82,15 +82,18 @@ class EfficientNetReform(nn.Module):
         ### BiFPN 8, 4, 2
         self.BifpnFirst = BiFPN(num_channels=256 + 64 * w , conv_channels=[64 * w,128 * w,256 * w],first_time=True)
         self.Bifpn = BiFPN(256 + 64 * w ,conv_channels=[],first_time=False)
-        self.actLayer = Swish()
         ### classify
         self.classify = classify
         if classify :
             self.p = nn.Parameter(torch.ones(3, dtype=torch.float32), requires_grad=True)
-            self.seq = nn.Sequential(nn.Linear(256 + 64 * w,1280),
-                                     nn.BatchNorm1d(1280),
+            self.rp3Res = nn.Sequential(MBConvBlock(256 + 64 * w,256 + 128 * w,drop_connect_rate),
+                                        MBConvBlock(256 + 128 * w,512,drop_connect_rate))
+            self.rp4Res = nn.Sequential(MBConvBlock(256 + 64 * w,512,drop_connect_rate))
+            self.rp5UpC = Conv2dDynamicSamePadding(256 + 64 * w,512,kernel_size=1)
+            self.seq = nn.Sequential(nn.Linear(512,1024),
+                                     nn.BatchNorm1d(1024),
                                      nn.Dropout(drop_connect_rate),
-                                     nn.Linear(1280,num_classes))
+                                     nn.Linear(1024,num_classes))
 
 
     def forward(self,x):
@@ -106,14 +109,18 @@ class EfficientNetReform(nn.Module):
         p4 = self.block8(self.block7(p3))
         rP3, rP4, rP5 = self.BifpnFirst(p2,p3,p4)
         rP3, rP4, rP5 = self.Bifpn(rP3, rP4, rP5)
-        # print(xStem.shape)
-        # print(p1.shape)
-        # print(p2.shape)
-        # print(p3.shape)
-        # print(p4.shape)
+        # print(rP3.shape)
+        # print(rP4.shape)
+        # print(rP5.shape)
         if self.classify:
             weight = F.relu(self.p)
             weight = weight / (torch.sum(weight, dim=0) + 1e-4)
+            rP3 = self.rp3Res(rP3)
+            rP4 = self.rp4Res(rP4)
+            rP5 = self.rp5UpC(rP5)
+            # print(rP3.shape)
+            # print(rP4.shape)
+            # print(rP5.shape)
             feat1 = F.adaptive_avg_pool2d(rP3,output_size=[1,1]) * weight[0]
             feat2 = F.adaptive_avg_pool2d(rP4,output_size=[1,1]) * weight[1]
             feat3 = F.adaptive_avg_pool2d(rP5,output_size=[1,1]) * weight[2]

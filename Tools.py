@@ -17,7 +17,6 @@ def AddN(tensorList : []):
 
 class Pool2dStaticSamePadding(nn.Module):
     """
-    created by Zylo117
     The real keras/tensorflow MaxPool2d with same padding
     """
 
@@ -65,7 +64,6 @@ class Pool2dStaticSamePadding(nn.Module):
 
 class Conv2dDynamicSamePadding(nn.Module):
     """
-    created by Zylo117
     The real keras/tensorflow conv2d with same padding
     """
 
@@ -111,7 +109,6 @@ class Swish(nn.Module):
 class Conv2dStaticSamePadding(nn.Module):
 
     """
-    created by Zylo117
     The real keras/tensorflow conv2d with same padding
     """
 
@@ -157,9 +154,6 @@ class Conv2dStaticSamePadding(nn.Module):
 
 
 class SeparableConvBlock(nn.Module):
-    """
-    created by Zylo117
-    """
 
     def __init__(self, in_channels, out_channels=None, norm=True, activation=False):
         super(SeparableConvBlock, self).__init__()
@@ -241,3 +235,30 @@ class Mish(nn.Module):
 
     def forward(self, x):
         return x * torch.tanh(F.softplus(x))
+
+class L2LossReg(nn.Module):
+
+    def __init__(self,lambda_coefficient):
+        super(L2LossReg,self).__init__()
+        self.l = lambda_coefficient
+
+    def forward(self,parameters):
+        tensors = []
+        for pari in parameters:
+            name = pari[0].lower()
+            tensor = pari[1]
+            if "bias" not in name and "bn" not in name and "p" not in name:
+                # print(name)
+                tensors.append(torch.sum(torch.pow(tensor,2.)))
+        return torch.mul(AddN(tensors),self.l)
+
+
+
+
+
+
+if __name__ == "__main__":
+    from EfficientReformModel import EfficientNetReform
+    model = EfficientNetReform(3)
+    testL2 = L2LossReg(1e-5)
+    print(testL2(model.named_parameters()))

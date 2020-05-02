@@ -8,6 +8,7 @@ import torch.optim.rmsprop as rmsprop
 from sklearn import metrics
 import EfficientReformModel
 from prefetch_generator import BackgroundGenerator
+from Tools import L2LossReg
 
 
 class DataLoaderX(d.DataLoader):
@@ -19,27 +20,27 @@ if __name__ == "__main__":
     ### config
     w = 2
     d = 3
-    batchSize = 16
+    batchSize = 20
     labelsNumber = 10
     epoch = 50
     displayTimes = 8
     ###
     modelSavePath = "./Model_Weight/"
-    saveTimes = 3200 # For training 400 step
+    saveTimes = 2000 # For training 500 step
     ###
     loadWeight= True
-    trainModelLoad = 0.81
+    trainModelLoad = 0.876
     ###
     valTestSampleNumber = 500
     ### trainingTimes = stepTimes * currentStep
-    tMaxIni = 180
-    maxLR = 1.25e-4
-    minLR = 1e-6
-    decayRate = 0.91
-    ## warmUpSteps * stepTimes
-    warmUpSteps = 180
+    tMaxIni = 300
+    maxLR = 3.2e-5
+    minLR = 8e-6
+    decayRate = 0.95
+    ## warmUpSteps * stepTimes = trainingTimes
+    warmUpSteps = 300
     ###
-    stepTimes = 8
+    stepTimes = 4
     ###
     ifTrain = True
     testModelLoad = 3
@@ -50,7 +51,8 @@ if __name__ == "__main__":
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
         tv.transforms.RandomHorizontalFlip(p = 0.25),
         tv.transforms.RandomVerticalFlip(p = 0.334),
-        tv.transforms.RandomApply([tv.transforms.CenterCrop(size=32),tv.transforms.ColorJitter()],p=0.5),
+        tv.transforms.RandomApply([tv.transforms.CenterCrop(size=32)],p=0.334),
+        tv.transforms.RandomApply([tv.transforms.ColorJitter()], p=0.25),
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
@@ -65,15 +67,18 @@ if __name__ == "__main__":
 
     cifarDataTrainSet = tv.datasets.CIFAR10(root="./Cifar10/",train=True,download=True,transform=transformationTrain)
     cifarDataTestSet = tv.datasets.CIFAR10(root="./Cifar10/",train=False,download=True,transform=transformationTest)
+    classes = ('plane', 'car', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     dataLoader = DataLoaderX(cifarDataTrainSet,batch_size=batchSize,shuffle=True,num_workers=4,pin_memory=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    ### model construct
-    model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.25,w=w,d=d,classify=True).to(device)
+    model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.32,w=w,d=d,classify=True).to(device)
+    l2Loss = L2LossReg(lambda_coefficient=1e-5)
     print(model)
-    lossCri = nn.CrossEntropyLoss(reduction="mean").to(device)
-    #optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9,weight_decay=1e-5)
-    optimizer = torch.optim.SGD(model.parameters(),minLR,momentum=0.9,nesterov=True,weight_decay=1e-5)
+    lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
+    #optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(),minLR,momentum=0.9,nesterov=True,weight_decay=0.)
+
     if loadWeight :
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
     else:
@@ -86,15 +91,15 @@ if __name__ == "__main__":
     ### Train or Test
     scheduler = CosineDecaySchedule(lrMin=minLR,lrMax=maxLR,tMaxIni=tMaxIni,factor=1.15,lrDecayRate=decayRate,warmUpSteps=warmUpSteps)
     if ifTrain:
-        model.train()
+        model = model.train(mode=True)
         trainingTimes = 0
         for e in range(epoch):
             for times , (images, labels) in enumerate(dataLoader):
                 imagesCuda = images.float().to(device,non_blocking = True)
                 labelsCuda = labels.long().to(device,non_blocking = True)
                 predict = model(imagesCuda)
-                oriLoss = lossCri(predict,labelsCuda)
-                loss = oriLoss / stepTimes
+                oriLoss = lossCri(predict,labelsCuda) + l2Loss(model.named_parameters())
+                loss = torch.div(oriLoss,stepTimes)
                 loss.backward()
                 trainingTimes += 1
                 if trainingTimes % displayTimes == 0:
@@ -116,7 +121,7 @@ if __name__ == "__main__":
                     optimizer.zero_grad()
                 if trainingTimes % saveTimes == 0 :
                     ### val part
-                    model.eval()
+                    model = model.eval()
                     predictList = []
                     truthList = []
                     k = 0
@@ -134,9 +139,9 @@ if __name__ == "__main__":
                             break
                     acc = metrics.accuracy_score(y_true=truthList, y_pred=predictList)
                     torch.save(model.state_dict(), modelSavePath + "Model_" + str(acc) + ".pth")
-                    model.train()
+                    model = model.train(mode=True)
     else:
-        model.eval()
+        model = model.eval()
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(testModelLoad) + ".pth"))
         predictList = []
         truthList = []
@@ -160,10 +165,6 @@ if __name__ == "__main__":
         print(classifiedInfor)
         print("The macro F1 is : ",macroF1)
         print("The micro F1 is : ",microF1)
-
-
-
-
 
 
 

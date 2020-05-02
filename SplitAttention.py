@@ -4,10 +4,10 @@ import torch.nn.functional as F
 from Tools import Swish
 from Tools import AddN
 
-def sumMax(x,dim = -1):
-    reluX = F.relu(x)
-    sumT = torch.sum(reluX,dim=dim,keepdim=True) + 1e-4
-    return reluX / sumT
+# def sumMax(x,dim = -1):
+#     reluX = F.relu(x)
+#     sumT = torch.sum(reluX,dim=dim,keepdim=True) + 1e-4
+#     return reluX / sumT
 
 
 class SplitAttention(nn.Module):
@@ -29,7 +29,7 @@ class SplitAttention(nn.Module):
         split2 = torch.chunk(attenAll,chunks=self.r,dim=-3)
         attenedList = []
         for i,one in enumerate(split2):
-            thisAtten = sumMax(one.view(-1,self.in_channels),dim=-1)
+            thisAtten = torch.softmax(one.view(-1,self.in_channels),dim=-1)
             attenedList.append(thisAtten.view(-1,self.in_channels,1,1) * inputs[i])
         return AddN(attenedList)
 
@@ -40,7 +40,8 @@ class Cardinal(nn.Module):
         super().__init__()
         self.r = R
         self.seq1 = nn.Sequential(nn.Conv2d(in_channels,in_channels,kernel_size=1,stride=1,groups=R),
-                                   nn.BatchNorm2d(in_channels,0.001,0.01))
+                                   nn.BatchNorm2d(in_channels,0.001,0.01),
+                                  Swish())
         self.seq3 = nn.Sequential(nn.Conv2d(in_channels,in_channels * R,kernel_size=3,stride=1,groups=R,padding=1),
                                    nn.BatchNorm2d(in_channels * R,0.001,0.01),
                                    Swish())
@@ -56,7 +57,7 @@ class ResNeSt(nn.Module):
         super().__init__()
         self.k = k
         self.Cardinals = nn.ModuleList([Cardinal(r,in_channels // k) for _ in range(k)])
-        self.seq = nn.Sequential(nn.Conv2d(in_channels,in_channels,1,1,groups=k * r),
+        self.seq = nn.Sequential(nn.Conv2d(in_channels,in_channels,1,1),
                                  nn.BatchNorm2d(in_channels,0.001,0.01))
 
     def forward(self, x):
