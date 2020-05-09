@@ -29,5 +29,7 @@ p4_Up = torch.nn.ConvTranspose2d(32,32,3,2,padding=[1,1],output_padding=[1,1],gr
 print(p4_Up(torch.randn(size=[5,32,17,17]).float()).shape)
 
 
+print(np.ones(shape=[5,7]) @ np.ones(shape=[7,3]))
+
 
 

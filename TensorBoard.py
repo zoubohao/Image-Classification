@@ -2,11 +2,12 @@ import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
-from EfficientReformModel import EfficientNetReform
+from EfficientReform import EfficientNetReform
 from BiFPN import BiFPN
 
 writer = SummaryWriter()
 model = EfficientNetReform(3,1,1)
+model = model.train(True)
 testInput = torch.randn(size=[8,3,32,32]).float()
 writer.add_graph(model,testInput)
 writer.close()

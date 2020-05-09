@@ -4,9 +4,9 @@ from torch.utils import data as d
 import numpy as np
 from CosineSchedule import CosineDecaySchedule
 import torch.nn as nn
-import torch.optim.rmsprop as rmsprop
+from torch.optim.adam import Adam
 from sklearn import metrics
-import EfficientReformModel
+import EfficientReform
 from prefetch_generator import BackgroundGenerator
 from Tools import L2LossReg
 
@@ -19,28 +19,32 @@ class DataLoaderX(d.DataLoader):
 if __name__ == "__main__":
     ### config
     w = 2
-    d = 3
-    batchSize = 20
+    d = 1
+    batchSize = 64
     labelsNumber = 10
     epoch = 50
-    displayTimes = 8
+    displayTimes = 12
+    drop_connect_rate = 0.1
+    reg_lambda = 1e-5
+    reduction = 'mean'
+    if_sgd = False
     ###
     modelSavePath = "./Model_Weight/"
-    saveTimes = 2000 # For training 500 step
+    saveTimes = 2500 # For training 1250 step
     ###
-    loadWeight= True
-    trainModelLoad = 0.876
+    loadWeight= False
+    trainModelLoad = 0.16
     ###
     valTestSampleNumber = 500
     ### trainingTimes = stepTimes * currentStep
-    tMaxIni = 300
-    maxLR = 3.2e-5
-    minLR = 8e-6
+    tMaxIni = 520
+    maxLR = 2e-4
+    minLR = 1e-4
     decayRate = 0.95
     ## warmUpSteps * stepTimes = trainingTimes
-    warmUpSteps = 300
+    warmUpSteps = 500
     ###
-    stepTimes = 4
+    stepTimes = 2
     ###
     ifTrain = True
     testModelLoad = 3
@@ -49,12 +53,13 @@ if __name__ == "__main__":
     ### Data pre-processing
     transformationTrain = tv.transforms.Compose([
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
-        tv.transforms.RandomHorizontalFlip(p = 0.25),
+        tv.transforms.RandomHorizontalFlip(p = 0.334),
         tv.transforms.RandomVerticalFlip(p = 0.334),
         tv.transforms.RandomApply([tv.transforms.CenterCrop(size=32)],p=0.334),
-        tv.transforms.RandomApply([tv.transforms.ColorJitter()], p=0.25),
+        tv.transforms.RandomApply([tv.transforms.ColorJitter()], p=0.334),
+        tv.transforms.RandomApply([tv.transforms.RandomRotation(degrees=90)], p = 0.334),
         tv.transforms.ToTensor(),
-        tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225]),
     ])
     transformationTest = tv.transforms.Compose([
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
@@ -67,17 +72,21 @@ if __name__ == "__main__":
 
     cifarDataTrainSet = tv.datasets.CIFAR10(root="./Cifar10/",train=True,download=True,transform=transformationTrain)
     cifarDataTestSet = tv.datasets.CIFAR10(root="./Cifar10/",train=False,download=True,transform=transformationTest)
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    classes = ('plane', 'car', 'bird', 'cat','deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     dataLoader = DataLoaderX(cifarDataTrainSet,batch_size=batchSize,shuffle=True,num_workers=4,pin_memory=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = EfficientReformModel.EfficientNetReform(in_channels=3,num_classes=labelsNumber,drop_connect_rate=0.32,w=w,d=d,classify=True).to(device)
-    l2Loss = L2LossReg(lambda_coefficient=1e-5)
+    model = EfficientReform.EfficientNetReform(in_channels=3, num_classes=labelsNumber,
+                                               drop_connect_rate=drop_connect_rate, w=w, d=d, classify=True).to(device)
+    l2Loss = L2LossReg(lambda_coefficient=reg_lambda)
     print(model)
-    lossCri = nn.CrossEntropyLoss(reduction="sum").to(device)
-    #optimizer = rmsprop.RMSprop(model.parameters(),minLR,momentum=0.9)
-    optimizer = torch.optim.SGD(model.parameters(),minLR,momentum=0.9,nesterov=True,weight_decay=0.)
+    lossCri = nn.CrossEntropyLoss(reduction=reduction).to(device)
+
+
+    if if_sgd :
+        optimizer = torch.optim.SGD(model.parameters(), minLR, momentum=0.9, nesterov=True, weight_decay=0.)
+    else:
+        optimizer = Adam(model.parameters(),minLR,weight_decay=0.)
 
     if loadWeight :
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
