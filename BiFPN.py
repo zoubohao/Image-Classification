@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 from Tools import SeparableConvBlock
-from Tools import Swish
 from Tools import Conv2dDynamicSamePadding
 from Tools import Pool2dStaticSamePadding
+from Tools import Swish
 
 class BiFPN(nn.Module):
     """
@@ -67,7 +67,7 @@ class BiFPN(nn.Module):
         self.p5_w2_relu = nn.ReLU()
 
 
-    def forward(self, p3, p4, p5):
+    def forward(self, inputs):
         """
         illustration of a minimal bifpn unit
             P5_0 -----------------*--------> P5_2 -------->
@@ -85,10 +85,12 @@ class BiFPN(nn.Module):
         # elif earlier phase, downsample to target phase's by pooling
         # elif later phase, upsample to target phase's by nearest interpolation
         if self.first_time:
+            p3,p4,p5 = inputs
             p3_in = self.p3_down_channel(p3)
             p4_in = self.p4_down_channel(p4)
             p5_in = self.p5_down_channel(p5)
         else:
+            p3, p4, p5 = inputs
             # P3_0, P4_0, P5_0
             p3_in = p3.clone()
             p4_in = p4.clone()
@@ -122,6 +124,8 @@ class BiFPN(nn.Module):
             self.swish4(weight[0] * p5_in  + weight[1] * self.p5_downsample(p4_out)))
 
         return p3_out, p4_out, p5_out
+
+
 
 if __name__ == "__main__":
     testP3 = torch.ones(size=[5,16,8,8])

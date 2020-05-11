@@ -107,22 +107,21 @@ class EfficientNetReform(nn.Module):
         # print(p3.shape)
         # print(p4.shape)
         # print(p5.shape)
-        p3_f, p4_f, p5_f = self.BifpnFirst(p3 = p3,p4 = p4,p5 = p5)
-        # print(p3_f.shape)
-        # print(p4_f.shape)
-        # print(p5_f.shape)
-        p3_s, p4_s, p5_s = self.Bifpn(p3 = p3_f, p4 = p4_f, p5 =  p5_f)
-        # print(p3_s.shape)
-        # print(p4_s.shape)
-        # print(fea5.shape)
+        p3_f,p4_f,p5_f = self.BifpnFirst((p3,p4,p5))
+        # print(BiFpn_first[0].shape)
+        # print(BiFpn_first[1].shape)
+        # print(BiFpn_first[2].shape)
+        p3_s,p4_s,p5_s = self.Bifpn((p3_f,p4_f,p5_f))
+        # print(BiFpn_second[0].shape)
+        # print(BiFpn_second[1].shape)
+        # print(BiFpn_second[2].shape)
         if self.classify:
             fea3 = self.resP3(p3_s.clone())
             fea4 = self.resP4(p4_s.clone())
-            feat = fea3 + fea4 + p5_s
+            feat = fea3 + fea4 + p5_s.clone()
             return self.seq(F.adaptive_avg_pool2d(feat,[1,1]).squeeze(-1).squeeze(-1).contiguous())
         else:
             return OrderedDict([("0",p5_s),("1",p4_s),("2",p3_s)])
-
 
 
 

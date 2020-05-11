@@ -4,11 +4,11 @@ from torch.utils import data as d
 import numpy as np
 from CosineSchedule import CosineDecaySchedule
 import torch.nn as nn
-from torch.optim.adam import Adam
 from sklearn import metrics
 import EfficientReform
 from prefetch_generator import BackgroundGenerator
 from Tools import L2LossReg
+import torch_optimizer as optim
 
 
 class DataLoaderX(d.DataLoader):
@@ -20,31 +20,30 @@ if __name__ == "__main__":
     ### config
     w = 2
     d = 1
-    batchSize = 64
+    batchSize = 100
     labelsNumber = 10
-    epoch = 50
-    displayTimes = 12
-    drop_connect_rate = 0.1
-    reg_lambda = 1e-5
+    epoch = 150
+    displayTimes = 10
+    drop_connect_rate = 0.12
+    reg_lambda = 1.1e-5
     reduction = 'mean'
-    if_sgd = False
     ###
     modelSavePath = "./Model_Weight/"
-    saveTimes = 2500 # For training 1250 step
+    saveTimes = 2000 # For training 2000 step
     ###
     loadWeight= False
-    trainModelLoad = 0.16
+    trainModelLoad = 0.802
     ###
     valTestSampleNumber = 500
     ### trainingTimes = stepTimes * currentStep
-    tMaxIni = 520
-    maxLR = 2e-4
-    minLR = 1e-4
-    decayRate = 0.95
+    tMaxIni = 1100
+    maxLR = 1e-2
+    minLR = 1e-2
+    decayRate = 0.975
     ## warmUpSteps * stepTimes = trainingTimes
-    warmUpSteps = 500
+    warmUpSteps = 1200
     ###
-    stepTimes = 2
+    stepTimes = 1
     ###
     ifTrain = True
     testModelLoad = 3
@@ -55,9 +54,7 @@ if __name__ == "__main__":
         #tv.transforms.Resize(size=[32 * 2,32 * 2]),
         tv.transforms.RandomHorizontalFlip(p = 0.334),
         tv.transforms.RandomVerticalFlip(p = 0.334),
-        tv.transforms.RandomApply([tv.transforms.CenterCrop(size=32)],p=0.334),
-        tv.transforms.RandomApply([tv.transforms.ColorJitter()], p=0.334),
-        tv.transforms.RandomApply([tv.transforms.RandomRotation(degrees=90)], p = 0.334),
+        tv.transforms.RandomApply([tv.transforms.RandomRotation(degrees=90)], p = 0.5),
         tv.transforms.ToTensor(),
         tv.transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225]),
     ])
@@ -81,13 +78,7 @@ if __name__ == "__main__":
     l2Loss = L2LossReg(lambda_coefficient=reg_lambda)
     print(model)
     lossCri = nn.CrossEntropyLoss(reduction=reduction).to(device)
-
-
-    if if_sgd :
-        optimizer = torch.optim.SGD(model.parameters(), minLR, momentum=0.9, nesterov=True, weight_decay=0.)
-    else:
-        optimizer = Adam(model.parameters(),minLR,weight_decay=0.)
-
+    optimizer = optim.optimizer = optim.Yogi(model.parameters(),lr= minLR,betas=(0.9, 0.999),eps=1e-4,initial_accumulator=1e-6,weight_decay=0)
     if loadWeight :
         model.load_state_dict(torch.load(modelSavePath + "Model_" + str(trainModelLoad) + ".pth"))
     else:

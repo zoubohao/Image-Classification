@@ -1,7 +1,5 @@
 import torch
-import torchvision
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import datasets, transforms
 from EfficientReform import EfficientNetReform
 from BiFPN import BiFPN
 

@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from Tools import AddN
-from Tools import Mish
 from Tools import Conv2dDynamicSamePadding
 
 class Split_Attention(nn.Module):
@@ -38,13 +37,13 @@ class Cardinal_Block(nn.Module):
         self.conv1 = Conv2dDynamicSamePadding(in_channels,in_channels,1,1,groups=r,bias=False)
         bn1Ordic = OrderedDict()
         for i in range(r):
-            bn1Ordic["BN_A1" + str(i)] = nn.BatchNorm2d(in_channels // r, eps=0.001, momentum=0.01)
+            bn1Ordic["BN_A1" + str(i)] = nn.Sequential(nn.BatchNorm2d(in_channels // r, eps=0.001, momentum=0.01),nn.ReLU(inplace=True))
         self.bn1Dic = nn.ModuleDict(bn1Ordic)
         ### Conv3
         self.conv3 = Conv2dDynamicSamePadding(in_channels,in_channels * r,3,1,groups=r,bias=False)
         bn2Oridic = OrderedDict()
         for i in range(r):
-            bn2Oridic["BN_A2" + str(i)] = nn.Sequential(nn.BatchNorm2d(in_channels,eps=0.001,momentum=0.01),Mish())
+            bn2Oridic["BN_A2" + str(i)] = nn.Sequential(nn.BatchNorm2d(in_channels,eps=0.001,momentum=0.01),nn.ReLU(inplace=True))
         self.bn2Dic = nn.ModuleDict(bn2Oridic)
         ### Split
         self.split_attention = Split_Attention(r,in_channels,inner_channels=in_channels * 2)

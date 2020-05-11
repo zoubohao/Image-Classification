@@ -68,11 +68,10 @@ class Blur_Pooling(nn.Module):
     def __init__(self,in_channels,pooling_type = "Max"):
         super().__init__()
         self.pooling = Pool2dStaticSamePadding(kernel_size=2,stride=1,pooling=pooling_type)
-        self.pool_size = 2
         bk = np.array([[1, 2, 1],
                        [2, 4, 2],
                        [1, 2, 1]])
-        bk = bk / np.sum(bk)
+        bk = bk / 4.
         bk = np.repeat(bk, in_channels)
         bk = np.reshape(bk, (in_channels,1,3,3))
         self.bk = nn.Parameter(torch.from_numpy(bk).float(),requires_grad=False)
@@ -81,7 +80,7 @@ class Blur_Pooling(nn.Module):
 
     def forward(self,x):
         x = self.pooling(x)
-        x = F.conv2d(x,self.bk,stride=[self.pool_size,self.pool_size],padding=1,groups=self.g)
+        x = F.conv2d(x,self.bk,stride=[2,2],padding=1,groups=self.g)
         return x
 
 
@@ -161,7 +160,7 @@ class SeparableConvBlock(nn.Module):
 
         self.activation = activation
         if self.activation:
-            self.mish = Mish()
+            self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.depthwise_conv(x)
@@ -171,7 +170,7 @@ class SeparableConvBlock(nn.Module):
             x = self.bn(x)
 
         if self.activation:
-            x = self.mish(x)
+            x = self.relu(x)
 
         return x
 
@@ -233,7 +232,7 @@ class L2LossReg(nn.Module):
             name = pari[0].lower()
             tensor = pari[1]
             if "bias" not in name and "bn" not in name and "p" not in name:
-               # print(name)
+                #print(name)
                 tensors.append(torch.sum(torch.pow(tensor,2.)))
         return torch.mul(AddN(tensors),self.l)
 
@@ -250,6 +249,12 @@ def drop_connect(inputs, p, training):
     return output
 
 if __name__ == "__main__":
-    testModel = Blur_Pooling(16).to(torch.device("cuda"))
-    testInput = torch.ones(size=[5,16,32,32]).float().to(torch.device("cuda"))
+    testModel = Blur_Pooling(16)
+    testInput = torch.ones(size=[5,16,32,32]).float()
     print(testModel(testInput).shape)
+    from EfficientReform import EfficientNetReform
+    model = EfficientNetReform(3)
+    testInput = torch.ones(size=[5,3,32,32]).float()
+    testResult = model(testInput)
+    l2 = L2LossReg(1e-5)
+    print(l2(model.named_parameters()))
