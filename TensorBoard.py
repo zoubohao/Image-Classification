@@ -1,10 +1,12 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from EfficientReform import EfficientNetReform
+from CombineNet import CombineNet
 from BiFPN import BiFPN
+from ResNest import ResNestNet
+from ResNestOri import resnest101
 
 writer = SummaryWriter()
-model = EfficientNetReform(3,1,1)
+model =  ResNestNet(3,10,0.5,1,2)
 model = model.train(True)
 testInput = torch.randn(size=[8,3,32,32]).float()
 writer.add_graph(model,testInput)

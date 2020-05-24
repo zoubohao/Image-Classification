@@ -25,11 +25,22 @@ import torch
 # print(resize)
 # print(upSampling.view([h * 2,w * 2,1]))
 
-p4_Up = torch.nn.ConvTranspose2d(32,32,3,2,padding=[1,1],output_padding=[1,1],groups=32)
-print(p4_Up(torch.randn(size=[5,32,17,17]).float()).shape)
+#p4_Up = torch.nn.ConvTranspose2d(32,32,3,2,padding=[1,1],output_padding=[1,1],groups=32)
+#print(p4_Up(torch.randn(size=[5,32,17,17]).float()).shape)
 
 
-print(np.ones(shape=[5,7]) @ np.ones(shape=[7,3]))
+#print(np.ones(shape=[5,7]) @ np.ones(shape=[7,3]))
+# print(torch.cuda.get_device_name(device=torch.device("cuda:0")))
+# print(torch.cuda.get_device_name(device=torch.device("cuda:1")))
+# a = [0,1,2,3,4]
+# aIter = iter(a)
+# a_next = next(aIter)
+# print(a_next)
+#
+# for b in aIter:
+#     print(b)
 
-
+from Tools import drop_connect_A
+testInput = torch.ones(size=[5,8,32,32]).float()
+print(drop_connect_A(testInput,0.5,True).sum())
 

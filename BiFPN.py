@@ -44,15 +44,15 @@ class BiFPN(nn.Module):
         if self.first_time:
             self.p5_down_channel = nn.Sequential(
                 Conv2dDynamicSamePadding(conv_channels[2], num_channels, 1),
-                nn.BatchNorm2d(num_channels, momentum=0.01, eps=1e-3),
+                nn.BatchNorm2d(num_channels),
             )
             self.p4_down_channel = nn.Sequential(
                 Conv2dDynamicSamePadding(conv_channels[1], num_channels, 1),
-                nn.BatchNorm2d(num_channels, momentum=0.01, eps=1e-3),
+                nn.BatchNorm2d(num_channels),
             )
             self.p3_down_channel = nn.Sequential(
                 Conv2dDynamicSamePadding(conv_channels[0], num_channels, 1),
-                nn.BatchNorm2d(num_channels, momentum=0.01, eps=1e-3),
+                nn.BatchNorm2d(num_channels),
             )
 
         # Weight

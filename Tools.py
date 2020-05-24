@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import math
 import torch.nn.functional as F
 
 
@@ -67,11 +66,13 @@ class Blur_Pooling(nn.Module):
 
     def __init__(self,in_channels,pooling_type = "Max"):
         super().__init__()
+        self.stride = [2,2]
+        self.kernel_size = [3,3]
         self.pooling = Pool2dStaticSamePadding(kernel_size=2,stride=1,pooling=pooling_type)
         bk = np.array([[1, 2, 1],
                        [2, 4, 2],
                        [1, 2, 1]])
-        bk = bk / 4.
+        bk = bk / np.sum(bk)
         bk = np.repeat(bk, in_channels)
         bk = np.reshape(bk, (in_channels,1,3,3))
         self.bk = nn.Parameter(torch.from_numpy(bk).float(),requires_grad=False)
@@ -80,7 +81,19 @@ class Blur_Pooling(nn.Module):
 
     def forward(self,x):
         x = self.pooling(x)
-        x = F.conv2d(x,self.bk,stride=[2,2],padding=1,groups=self.g)
+        h, w = x.shape[-2:]
+        h_step = math.ceil(w / self.stride[1])
+        v_step = math.ceil(h / self.stride[0])
+        h_cover_len = self.stride[1] * (h_step - 1) + 1 + (self.kernel_size[1] - 1)
+        v_cover_len = self.stride[0] * (v_step - 1) + 1 + (self.kernel_size[0] - 1)
+        extra_h = h_cover_len - w
+        extra_v = v_cover_len - h
+        left = extra_h // 2
+        right = extra_h - left
+        top = extra_v // 2
+        bottom = extra_v - top
+        x = F.pad(x, [left, right, top, bottom])
+        x = F.conv2d(x,self.bk,stride=[2,2],groups=self.g)
         return x
 
 
@@ -125,6 +138,17 @@ class Conv2dDynamicSamePadding(nn.Module):
         x = self.conv(x)
         return x
 
+class Blur_Down_Sample(nn.Module):
+
+    def __init__(self,in_channels,out_channels,pooling_type):
+        super().__init__()
+        self.blur_pooling = Blur_Pooling(in_channels, pooling_type=pooling_type)
+        self.convTrans = Conv2dDynamicSamePadding(in_channels,out_channels,1,bias=False)
+        self.bn =  nn.BatchNorm2d(out_channels,eps=1e-3,momentum=1e-2)
+
+    def forward(self,x):
+        return self.bn(self.convTrans(self.blur_pooling(x)))
+
 
 class Swish(nn.Module):
     def __init__(self):
@@ -156,7 +180,7 @@ class SeparableConvBlock(nn.Module):
         self.norm = norm
         if self.norm:
             # Warning: pytorch momentum is different from tensorflow's, momentum_pytorch = 1 - momentum_tensorflow
-            self.bn = nn.BatchNorm2d(out_channels,eps=1e-3,momentum=0.01)
+            self.bn = nn.BatchNorm2d(out_channels)
 
         self.activation = activation
         if self.activation:
@@ -191,17 +215,23 @@ def plot_grad_flow(named_parameters):
     "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow"""
     ave_grads = []
     layers = []
+    noneList = []
     for n, p in named_parameters:
-        if p.requires_grad and ("bias" not in n):
+        if p.requires_grad:
             layers.append(n)
             print("########")
             print(n)
             if p.grad is not None:
                 print(p.grad.abs().mean())
                 ave_grads.append(p.grad.abs().mean())
+                # if p.grad.abs().mean() == 0:
+                #     break
             else:
-                print(0)
-                ave_grads.append(0)
+                print(None)
+                noneList.append(n)
+    print("Min grad : ",min(ave_grads))
+    print("Max ",max(ave_grads))
+    print(noneList)
     plt.plot(ave_grads, alpha=0.3, color="b")
     plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
@@ -236,8 +266,35 @@ class L2LossReg(nn.Module):
                 tensors.append(torch.sum(torch.pow(tensor,2.)))
         return torch.mul(AddN(tensors),self.l)
 
+def l2LossFunction(parameters,l):
+    tensors = []
+    for pari in parameters:
+        name = pari[0].lower()
+        tensor = pari[1]
+        if "bias" not in name and "bn" not in name and "p" not in name:
+            # print(name)
+            tensors.append(torch.sum(torch.pow(tensor, 2.)))
+    return torch.mul(AddN(tensors),l)
 
-def drop_connect(inputs, p, training):
+import math
+import torch.utils.data
+def get_mean_and_std(dataset):
+    '''
+    Compute the mean and std value of dataset.
+    '''
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=2)
+    mean = torch.zeros(3)
+    std = torch.zeros(3)
+    print('==> Computing mean and std..')
+    for inputs, targets in dataloader:
+        for i in range(3):
+            mean[i] += inputs[:,i,:,:].mean()
+            std[i] += inputs[:,i,:,:].std()
+    mean.div_(len(dataset))
+    std.div_(len(dataset))
+    return mean, std
+
+def drop_connect_A(inputs, p, training):
     """ Drop connect. """
     if training is False: return inputs
     batch_size = inputs.shape[0]
@@ -248,13 +305,16 @@ def drop_connect(inputs, p, training):
     output = inputs / keep_prob * binary_tensor
     return output
 
+
+def drop_connect_B(x, drop_ratio):
+    keep_ratio = 1.0 - drop_ratio
+    mask = torch.empty([x.shape[0], 1, 1, 1], dtype=x.dtype, device=x.device)
+    mask.bernoulli_(p=keep_ratio)
+    x.div_(keep_ratio)
+    x.mul_(mask)
+    return x
+
 if __name__ == "__main__":
     testModel = Blur_Pooling(16)
     testInput = torch.ones(size=[5,16,32,32]).float()
     print(testModel(testInput).shape)
-    from EfficientReform import EfficientNetReform
-    model = EfficientNetReform(3)
-    testInput = torch.ones(size=[5,3,32,32]).float()
-    testResult = model(testInput)
-    l2 = L2LossReg(1e-5)
-    print(l2(model.named_parameters()))
