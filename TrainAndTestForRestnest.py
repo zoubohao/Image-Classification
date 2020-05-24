@@ -17,12 +17,12 @@ if __name__ == "__main__":
     ### config
     w = 1
     d = 2
-    batchSize = 128
+    batchSize = 92
     labelsNumber = 10
     epoch = 150
     displayTimes = 10
     drop_connect_rate = 0.25
-    reg_lambda = 3e-4
+    reg_lambda = 5e-4
     split = 43
     reduction = 'mean'
     if_sgd = False

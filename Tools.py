@@ -221,7 +221,7 @@ def plot_grad_flow(named_parameters):
             layers.append(n)
             print("########")
             print(n)
-            if p.grad is not None:
+            if p.grad is not None and "bias" not in n:
                 print(p.grad.abs().mean())
                 ave_grads.append(p.grad.abs().mean())
                 # if p.grad.abs().mean() == 0:

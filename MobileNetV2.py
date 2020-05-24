@@ -15,8 +15,9 @@ class Inverted_Residual_Block(nn.Module):
                                        nn.BatchNorm2d(in_channels * expansion_factor,eps=1e-3,momentum=1e-2),
                                        Mish())
         self.depthwise_conv = nn.Sequential(Conv2dDynamicSamePadding(in_channels* expansion_factor, in_channels* expansion_factor,
-                                                      kernel_size=3, stride=stride, groups=in_channels* expansion_factor, bias=False),
-                                            nn.BatchNorm2d(in_channels * expansion_factor,eps=1e-3,momentum=1e-2),
+                                                      kernel_size=3, stride=stride, groups=in_channels * expansion_factor, bias=False),
+                                            nn.GroupNorm(num_groups=in_channels * expansion_factor,
+                                                         num_channels=in_channels* expansion_factor,eps=1e-3,affine=True),
                                             Mish())
         self.pointwise_conv = nn.Sequential(Conv2dDynamicSamePadding(in_channels * expansion_factor, out_channels, kernel_size=1, stride=1),
                                             nn.BatchNorm2d(out_channels,eps=1e-3,momentum=1e-2))

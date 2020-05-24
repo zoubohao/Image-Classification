@@ -38,10 +38,10 @@ class Cardinal_Block(nn.Module):
         self.r = r
         ### Conv
         self.conv1 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,in_channels,1,1,groups=r,bias=False),
-                                   nn.BatchNorm2d(in_channels,eps=1e-3,momentum=1e-2),
+                                   nn.GroupNorm(num_groups=r,num_channels=in_channels,eps=1e-3,affine=True),
                                    Mish())
         self.conv3 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,in_channels * r,3,1,groups=r,bias=False),
-                                   nn.BatchNorm2d(in_channels * r,eps=1e-3,momentum=1e-2),
+                                   nn.GroupNorm(num_groups=r,num_channels=in_channels * r,eps=1e-3,affine=True),
                                    Mish())
         ### Split
         self.split_attention = Split_Attention(r,in_channels,inner_channels=in_channels * 2)
@@ -107,14 +107,14 @@ class ResNestNet(nn.Module):
         self.conv1 = nn.Sequential(Conv2dDynamicSamePadding(in_channels,64 * w,7,1,bias=False),
                                    nn.BatchNorm2d(64 * w,eps=1e-3,momentum=1e-2),
                                    Mish())
-        self.b1 = Bottleneck(64 * w, 128 * w, 2 * d,pooling="AVG",dropRate=dropRate)
+        self.b1 = Bottleneck(64 * w, 128 * w, 3 * d,pooling="AVG",dropRate=dropRate)
         self.b2 = Bottleneck(128 * w, 256 * w, 4 * d,pooling="AVG",dropRate=dropRate)
         self.b3 = Bottleneck(256 * w, 512 * w, 6 * d,pooling="AVG",dropRate=dropRate)
-        self.b4 = Bottleneck(512 * w, 1024 * w, 2 * d,pooling="AVG",dropRate=dropRate)
+        self.b4 = Bottleneck(512 * w, 1024 * w, 3 * d,pooling="AVG",dropRate=dropRate)
         self.conv2 = nn.Sequential(nn.Conv2d(1024 * w, 1280,1,1,0,bias=False),
                                    nn.BatchNorm2d(1280),
                                    Mish())
-        self.dropout = nn.Dropout(dropRate + 0.3,True)
+        self.dropout = nn.Dropout(dropRate + 0.2 ,True)
         self.fc = nn.Linear(1280 , num_classes)
         self._initialize_weights()
 

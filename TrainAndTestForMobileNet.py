@@ -17,7 +17,7 @@ if __name__ == "__main__":
     ### config
     w = 2
     d = 2
-    batchSize = 128
+    batchSize = 102
     labelsNumber = 10
     epoch = 150
     displayTimes = 10
