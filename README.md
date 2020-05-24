@@ -1,2 +1,2 @@
 # Image-Classification
-Image Classification test
+CIFAR 10 Image Classification.
