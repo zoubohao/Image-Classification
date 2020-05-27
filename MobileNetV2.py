@@ -66,7 +66,7 @@ class MobileNetV2(nn.Module):
         self.conv2 = nn.Sequential(nn.Conv2d(320 * w,1280,1,1,bias=False),
                                    nn.BatchNorm2d(1280),
                                    Mish())
-        self.dropout = nn.Dropout(dropRate+0.3,True)
+        self.dropout = nn.Dropout(dropRate + 0.3,True)
         self.fc = nn.Linear(1280,num_classes)
         self._initialize_weights()
 

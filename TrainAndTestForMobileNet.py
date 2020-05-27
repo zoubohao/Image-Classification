@@ -14,28 +14,28 @@ from MobileNetV2 import MobileNetV2
 # # 0.001 for epoch [150,250)
 # # 0.0001 for epoch [250,350)
 if __name__ == "__main__":
-    ### config
+    ### config 0.9258
     w = 2
     d = 2
     batchSize = 102
     labelsNumber = 10
-    epoch = 150
+    epoch = 100
     displayTimes = 10
-    drop_connect_rate = 0.25
+    drop_connect_rate = 0.45
     reg_lambda = 5e-4
     split = 43
     reduction = 'mean'
-    if_sgd = False
+    if_sgd = True
     ###
     modelSavePath = "./Model_Weight/"
     saveTimes = 2000 # For training 2000 step
     ###
-    loadWeight= False
-    trainModelLoad = 0.7801
+    loadWeight= True
+    trainModelLoad = 0.924
     ### trainingTimes = stepTimes * currentStep
     tMaxIni = 1000
-    maxLR = 1e-2
-    minLR = 1e-2
+    maxLR = 1e-4
+    minLR = 1e-4
     decayRate = 0.96
     ## warmUpSteps * stepTimes = trainingTimes
     warmUpSteps = 1000

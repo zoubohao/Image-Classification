@@ -114,7 +114,7 @@ class ResNestNet(nn.Module):
         self.conv2 = nn.Sequential(nn.Conv2d(1024 * w, 1280,1,1,0,bias=False),
                                    nn.BatchNorm2d(1280),
                                    Mish())
-        self.dropout = nn.Dropout(dropRate + 0.2 ,True)
+        self.dropout = nn.Dropout(dropRate + 0.3 ,True)
         self.fc = nn.Linear(1280 , num_classes)
         self._initialize_weights()
 
