@@ -1,9 +1,6 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from CombineNet import CombineNet
-from BiFPN import BiFPN
-from ResNest import ResNestNet
-from ResNestOri import resnest101
+from Models.ResNest import ResNestNet
 
 writer = SummaryWriter()
 model =  ResNestNet(3,10,0.5,1,2)
