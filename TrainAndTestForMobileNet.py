@@ -6,7 +6,7 @@ import torch.nn as nn
 from sklearn import metrics
 import torch_optimizer as optim
 from torch.utils.data import DataLoader
-from MobileNetV2 import MobileNetV2
+from Models.MobileNetV2 import MobileNetV2
 
 
 
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     saveTimes = 2000 # For training 2000 step
     ###
     loadWeight= True
-    trainModelLoad = 0.924
+    trainModelLoad = 0.9258
     ### trainingTimes = stepTimes * currentStep
     tMaxIni = 1000
     maxLR = 1e-4

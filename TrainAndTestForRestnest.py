@@ -6,7 +6,7 @@ import torch.nn as nn
 from sklearn import metrics
 import torch_optimizer as optim
 from torch.utils.data import DataLoader
-from ResNest import ResNestNet
+from Models.ResNest import ResNestNet
 
 
 
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     saveTimes = 2000 # For training 2000 step
     ###
     loadWeight=  True
-    trainModelLoad = 0.9036
+    trainModelLoad = 0.9051
     ### trainingTimes = stepTimes * currentStep
     tMaxIni = 1000
     maxLR = 1e-5
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     tv.transforms.RandomHorizontalFlip(),
     tv.transforms.ToTensor(),
     tv.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
+    ])
     transformationTest = tv.transforms.Compose([
         tv.transforms.ToTensor(),
         tv.transforms.Normalize((0.4914, 0.4822, 0.4465),(0.2023, 0.1994, 0.2010))
